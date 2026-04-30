@@ -1,0 +1,12 @@
+[submodule "nerfstudio-gnt/GNT"]
+	path = nerfstudio-gnt/GNT
+	url = https://github.com/VITA-Group/GNT
+[submodule "nerfstudio-pixel-nerf/pixel-nerf"]
+	path = nerfstudio-pixel-nerf/pixel-nerf
+	url = https://github.com/sxyu/pixel-nerf
+[submodule "nerfstudio-ibrnet/ibrnet"]
+	path = nerfstudio-ibrnet/ibrnet
+	url = https://github.com/googleinterns/ibrnet
+[submodule "nerfstudio-zero-1-to-3/zero123"]
+	path = nerfstudio-zero-1-to-3/zero123
+	url = https://github.com/cvlab-columbia/zero123
