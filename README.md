@@ -8,3 +8,5 @@ a NeRFStudio unnoficial implementation for:
 - [ ] VolRecon
 - [ ] IBRNet
 - [ ] Zero-1-to-3
+
+this repo (each impl) will later be added into PyPi for those who want to import and use it alongside you default nerfstudio env
