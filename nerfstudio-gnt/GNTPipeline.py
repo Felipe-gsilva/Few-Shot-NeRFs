@@ -7,17 +7,24 @@ import torch
 
 import torch.nn as nn
 
+
 @dataclass
 class GNTPipelineConfig:
     """Config for the GNTPipeline. This is where you can add any hyperparameters or
     settings that you want to be able to easily change when initializing the pipeline.
     """
+
     model_config: GNTModelConfig = field(default_factory=GNTModelConfig)
-    datamanager_config: GNTDataManagerConfig = field(default_factory=GNTDataManagerConfig)
-    scene_box: SceneBox = field(default_factory=lambda: SceneBox(
-        aabb=torch.tensor([[-1,-1,-1],[1,1,1]], dtype=torch.float32)
-    ))
+    datamanager_config: GNTDataManagerConfig = field(
+        default_factory=GNTDataManagerConfig
+    )
+    scene_box: SceneBox = field(
+        default_factory=lambda: SceneBox(
+            aabb=torch.tensor([[-1, -1, -1], [1, 1, 1]], dtype=torch.float32)
+        )
+    )
     num_train_data: int = 0
+
 
 class GNTPipeline(nn.Module):
     model: GNTModel

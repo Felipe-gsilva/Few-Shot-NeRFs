@@ -28,6 +28,7 @@ def de_parallel(model):
 @dataclass
 class GNTModelConfig(ModelConfig):
     """Config for the GNTModel. This is where you can set hyperparameters for your model, such as the number of layers, hidden dimensions, etc."""
+
     _target: Type = field(default_factory=lambda: GNTModel, init=False)
     coarse_feat_dim: int = 48
     """The number of feature channels for the coarse MLP."""
@@ -90,16 +91,19 @@ class GNTModel(Model):
     def __init__(
         self,
         config: GNTModelConfig,
-        scene_box: SceneBox = SceneBox(aabb=torch.tensor([[-1,-1,-1],[1,1,1]], dtype=torch.float32)),
+        scene_box: SceneBox = SceneBox(
+            aabb=torch.tensor([[-1, -1, -1], [1, 1, 1]], dtype=torch.float32)
+        ),
         num_train_data: int = 0,
         **kwargs,
     ):
-        super().__init__(config=config, scene_box=scene_box, num_train_data=num_train_data, **kwargs)
-
+        super().__init__(
+            config=config, scene_box=scene_box, num_train_data=num_train_data, **kwargs
+        )
 
     def populate_modules(self):
         super().populate_modules()
-        
+
         args = SimpleNamespace(
             netwidth=self.config.netwidth,
             trans_depth=self.config.transdepth,
@@ -113,12 +117,16 @@ class GNTModel(Model):
             ret_alpha=self.config.N_importance > 0,
         )
 
-        self.net_fine = None if self.config.single_net else GNT(
-            args,
-            in_feat_ch=self.config.fine_feat_dim,
-            posenc_dim=3 + 3 * 2 * 10,
-            viewenc_dim=3 + 3 * 2 * 10,
-            ret_alpha=True,
+        self.net_fine = (
+            None
+            if self.config.single_net
+            else GNT(
+                args,
+                in_feat_ch=self.config.fine_feat_dim,
+                posenc_dim=3 + 3 * 2 * 10,
+                viewenc_dim=3 + 3 * 2 * 10,
+                ret_alpha=True,
+            )
         )
 
         self.feature_net = ResUNet(
@@ -129,7 +137,9 @@ class GNTModel(Model):
 
         # Use a dummy device for projector at init time;
         # update it in get_outputs where self.device is available
-        self.projector = Projector(device=torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+        self.projector = Projector(
+            device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        )
 
         out_folder = os.path.join(self.config.out_dir, self.config.exp_name, "ckpts")
         self.start_step = self.load_from_ckpt(out_folder)
@@ -141,7 +151,6 @@ class GNTModel(Model):
             + list(self.feature_net.parameters())
             + (list(self.net_fine.parameters()) if self.net_fine else [])
         }
-
 
     def get_training_callbacks(
         self, training_callback_attributes: TrainingCallbackAttributes
@@ -280,8 +289,7 @@ class GNTModel(Model):
         self, outputs: Dict[str, torch.Tensor], batch: Dict[str, torch.Tensor]
     ) -> Tuple[Dict[str, float], Dict[str, torch.Tensor]]:
         """Returns a dictionary of images and metrics to plot. Here you can apply your colormaps."""
-        
+
         raise NotImplementedError(
             "You need to implement this method to return the images and metrics you want to plot during training."
         )
-        

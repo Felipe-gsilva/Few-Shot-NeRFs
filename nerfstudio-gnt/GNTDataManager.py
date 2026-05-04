@@ -74,7 +74,7 @@ class GNTDataManager(DataManager):
         self.local_rank = local_rank
         self.config.local_rank = local_rank
         self.config.distributed = world_size > 1
-        
+
         self.setup_train()
         if self.test_mode in ["test", "val"]:
             self.setup_eval()
