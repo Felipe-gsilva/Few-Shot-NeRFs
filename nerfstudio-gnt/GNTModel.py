@@ -2,11 +2,13 @@
 This is a GNTModel implementation for NeRFStudio. You can see I moslty copied the code from @GNT.gnt.model.py and modified it to fit the NeRFStudio framework. Credits belong moslty to https://github.com/VITA-Group/GNT.
 """
 
-from dataclasses import dataclass, field
 import os
-from nerfstudio.cameras.cameras import Cameras
+from types import SimpleNamespace
+from nerfstudio.data.scene_box import SceneBox
 import torch
 
+from dataclasses import dataclass, field
+from nerfstudio.cameras.cameras import Cameras
 from torch.nn import Parameter
 from typing import Dict, List, Optional, Tuple, Type, Union, cast
 from nerfstudio.models.base_model import Model, ModelConfig
@@ -26,7 +28,6 @@ def de_parallel(model):
 @dataclass
 class GNTModelConfig(ModelConfig):
     """Config for the GNTModel. This is where you can set hyperparameters for your model, such as the number of layers, hidden dimensions, etc."""
-
     _target: Type = field(default_factory=lambda: GNTModel, init=False)
     coarse_feat_dim: int = 48
     """The number of feature channels for the coarse MLP."""
@@ -86,40 +87,51 @@ class GNTModel(Model):
     projector: Projector
     """The projector for projecting the 3D points to 2D image space. This is used for sampling the features from the feature net."""
 
+    def __init__(
+        self,
+        config: GNTModelConfig,
+        scene_box: SceneBox = SceneBox(aabb=torch.tensor([[-1,-1,-1],[1,1,1]], dtype=torch.float32)),
+        num_train_data: int = 0,
+        **kwargs,
+    ):
+        super().__init__(config=config, scene_box=scene_box, num_train_data=num_train_data, **kwargs)
+
+
     def populate_modules(self):
-        """Set the fields and modules."""
         super().populate_modules()
-        args = {
-            "netwidth": self.config.netwidth,
-            "transdepth": self.config.transdepth,
-        }
+        
+        args = SimpleNamespace(
+            netwidth=self.config.netwidth,
+            trans_depth=self.config.transdepth,
+        )
+
         self.net_coarse = GNT(
             args,
             in_feat_ch=self.config.coarse_feat_dim,
             posenc_dim=3 + 3 * 2 * 10,
             viewenc_dim=3 + 3 * 2 * 10,
             ret_alpha=self.config.N_importance > 0,
-        ).to(self.device)
+        )
 
-        if self.config.single_net:
-            self.net_fine = None
-        else:
-            self.net_fine = GNT(
-                args,
-                in_feat_ch=self.config.fine_feat_dim,
-                posenc_dim=3 + 3 * 2 * 10,
-                viewenc_dim=3 + 3 * 2 * 10,
-                ret_alpha=True,
-            ).to(self.device)
+        self.net_fine = None if self.config.single_net else GNT(
+            args,
+            in_feat_ch=self.config.fine_feat_dim,
+            posenc_dim=3 + 3 * 2 * 10,
+            viewenc_dim=3 + 3 * 2 * 10,
+            ret_alpha=True,
+        )
 
         self.feature_net = ResUNet(
             coarse_out_ch=self.config.coarse_feat_dim,
             fine_out_ch=self.config.fine_feat_dim,
             single_net=self.config.single_net,
-        ).to(self.device)
+        )
+
+        # Use a dummy device for projector at init time;
+        # update it in get_outputs where self.device is available
+        self.projector = Projector(device=torch.device("cuda" if torch.cuda.is_available() else "cpu"))
 
         out_folder = os.path.join(self.config.out_dir, self.config.exp_name, "ckpts")
-        self.projector = Projector(device=self.device)
         self.start_step = self.load_from_ckpt(out_folder)
 
     def get_param_groups(self) -> Dict[str, List[Parameter]]:
@@ -129,6 +141,7 @@ class GNTModel(Model):
             + list(self.feature_net.parameters())
             + (list(self.net_fine.parameters()) if self.net_fine else [])
         }
+
 
     def get_training_callbacks(
         self, training_callback_attributes: TrainingCallbackAttributes
@@ -142,6 +155,7 @@ class GNTModel(Model):
         assert isinstance(ray_bundle, RayBundle), (
             "GNTModel only supports RayBundle, not Cameras"
         )
+        self.projector.device = next(self.parameters()).device
 
         src_rgbs = ray_bundle.metadata["src_rgbs"]
         featmaps = self.feature_net(src_rgbs.squeeze(0).permute(0, 3, 1, 2))
@@ -261,3 +275,13 @@ class GNTModel(Model):
             step = 0
 
         return step
+
+    def get_image_metrics_and_images(
+        self, outputs: Dict[str, torch.Tensor], batch: Dict[str, torch.Tensor]
+    ) -> Tuple[Dict[str, float], Dict[str, torch.Tensor]]:
+        """Returns a dictionary of images and metrics to plot. Here you can apply your colormaps."""
+        
+        raise NotImplementedError(
+            "You need to implement this method to return the images and metrics you want to plot during training."
+        )
+        

@@ -1,3 +1,4 @@
+from torch.utils.data import DataLoader
 from GNT.gnt.sample_ray import RaySamplerSingleImage
 from GNT.utils import cycle
 import torch
@@ -5,21 +6,15 @@ import numpy as np
 import copy
 
 from dataclasses import dataclass, field
-from inspect import Parameter
 from pathlib import Path
-from typing import Dict, Generic, List, Literal, Optional, Tuple, Type, Union, overload
-from nerfstudio.cameras.cameras import Cameras
+from typing import Dict, List, Literal, Optional, Tuple, Type, Union
 from nerfstudio.cameras.rays import RayBundle
 from nerfstudio.data.datamanagers.base_datamanager import (
     DataManager,
     DataManagerConfig,
 )
-from nerfstudio.data.dataparsers.base_dataparser import DataparserOutputs
-from nerfstudio.data.datasets.base_dataset import InputDataset
-from nerfstudio.data.utils.dataloaders import CacheDataloader
-from torch.utils.data import DataLoader, Dataset, Sampler
 from GNT.gnt.data_loaders.create_training_dataset import create_training_dataset
-from GNT.gnt.data_loaders import dataset_dict, llff
+from GNT.gnt.data_loaders import dataset_dict
 
 
 @dataclass
@@ -32,8 +27,6 @@ class GNTDataManagerConfig(DataManagerConfig):
 
     _target: Type = field(default_factory=lambda: GNTDataManager, init=False)
     """The target class to instantiate, in this case, GNTDataManager."""
-    data: Path = Path("data/")
-    """Path to the dataset root directory."""
     center_ratio: float = 0.5
     """Ratio of rays to sample from the center of the image. Only used if sample_mode is 'center'."""
     sample_mode: Literal["all", "center"] = "all"
@@ -50,9 +43,9 @@ class GNTDataManagerConfig(DataManagerConfig):
     """Dictionary mapping dataset names to their corresponding weights for sampling during training. Only used if multiple datasets are used for training."""
     distributed = False
     """Whether to use distributed training. If True, the data manager will use a DistributedSampler for the training dataset."""
-    train_dataset: Optional[Literal["llff"]] = None
+    train_dataset: str = "llff"
     """Default GNT implementation for creating training datasets. If None, the data manager will load datasets normally without GNT's custom dataset creation function."""
-    eval_dataset: Optional[Literal["llff"]] = None
+    eval_dataset: str = "llff"
     """Default GNT implementation for creating evaluation datasets. If None, the data manager will use the same dataset as train_dataset for evaluation."""
     train_scenes = None
     """List of scenes to use for training. If None, all scenes in the training dataset will be used."""
@@ -81,9 +74,17 @@ class GNTDataManager(DataManager):
         self.local_rank = local_rank
         self.config.local_rank = local_rank
         self.config.distributed = world_size > 1
-        super().__init__()  # triggers setup_train() and setup_eval()
+        
+        self.setup_train()
+        if self.test_mode in ["test", "val"]:
+            self.setup_eval()
 
     def setup_train(self):
+        if self.config.train_dataset is None:
+            raise ValueError(
+                "train_dataset must be set in GNTDataManagerConfig. "
+                f"Available datasets: {list(dataset_dict.keys())}"
+            )
         train_dataset, train_sampler = create_training_dataset(self.config)
         self.train_loader = DataLoader(
             train_dataset,
@@ -158,6 +159,3 @@ class GNTDataManager(DataManager):
     def get_eval_rays_per_batch(self) -> int:
         # eval renders full images, so H*W — return a sentinel if unknown
         return self.config.train_num_rays_per_batch
-
-    def get_datapath(self) -> Path:
-        return Path(self.config.data)

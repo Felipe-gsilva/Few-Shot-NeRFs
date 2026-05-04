@@ -1,16 +1,6 @@
-from GNTDataManager import GNTDataManager, GNTDataManagerConfig
-from GNTModel import GNTModel, GNTModelConfig
+from GNTPipeline import GNTPipeline
 
 
-datamanager = GNTDataManager(
-    config=GNTDataManagerConfig(),
-)
+pipeline = GNTPipeline()
 
-model = GNTModel(
-    config=GNTModelConfig(),
-    scene_box=datamanager.scene_box,
-    num_train_data=len(datamanager.train_loader.dataset),
-)
-
-print(datamanager.config)
-print(model.config)
+print(pipeline.get_train_loss_dict(0))
