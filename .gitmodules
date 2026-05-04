@@ -10,3 +10,7 @@
 [submodule "nerfstudio-zero-1-to-3/zero123"]
 	path = nerfstudio-zero-1-to-3/zero123
 	url = https://github.com/cvlab-columbia/zero123
+
+[submodule "nerfstudio-volrecon/volrecon"]
+	path = nerfstudio-volrecon/volrecon
+	url = https://github.com/IVRL/VolRecon
