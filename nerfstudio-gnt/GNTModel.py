@@ -168,16 +168,17 @@ class GNTModel(Model):
         )
         self.projector.device = next(self.parameters()).device
 
-        src_rgbs = ray_bundle.metadata["src_rgbs"]
-        featmaps = self.feature_net(src_rgbs.squeeze(0).permute(0, 3, 1, 2))
+        ctx = ray_bundle.metadata["ctx"]
+        src_rgbs = ctx.src_rgbs  # (K, H, W, 3) — leading batch-1 dim already squeezed
+        featmaps = self.feature_net(src_rgbs.permute(0, 3, 1, 2))
 
         ray_batch = {
             "ray_o": ray_bundle.origins,
             "ray_d": ray_bundle.directions,
-            "depth_range": ray_bundle.metadata["depth_range"],
-            "src_rgbs": src_rgbs,
-            "src_cameras": ray_bundle.metadata["src_cameras"],
-            "camera": ray_bundle.metadata["camera"],
+            "depth_range": ctx.depth_range.unsqueeze(0),  # render_rays expects (1, 2)
+            "src_rgbs": src_rgbs.unsqueeze(0),            # render_rays expects (1, K, H, W, 3)
+            "src_cameras": ctx.src_cameras.unsqueeze(0),  # render_rays expects (1, K, 34)
+            "camera": ctx.camera.unsqueeze(0),            # render_rays expects (1, 34)
         }
         ret = render_rays(
             ray_batch=ray_batch,

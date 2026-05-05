@@ -2417,7 +2417,7 @@ wheels = [
 [[package]]
 name = "nerfstudio"
 version = "1.1.5"
-source = { git = "https://github.com/felipe-gsilva/nerfstudio#f2f63e9dfea8b330b7cea0bd1f0e384ead760c6e" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "appdirs" },
     { name = "av" },
@@ -2469,10 +2469,14 @@ dependencies = [
     { name = "wandb" },
     { name = "xatlas" },
 ]
+sdist = { url = "https://files.pythonhosted.org/packages/3a/28/715d6db9ace41edf493a544504cca4872547844e7cd0f2f6cfe0dbd3d411/nerfstudio-1.1.5.tar.gz", hash = "sha256:c3d8fd27208565e2031e4b0c89f82eb78199207d5194755f5b6c8f41e02f4cf9", size = 413109, upload-time = "2024-11-11T21:22:46.729Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ee/86/93a22f779f3810be8ddbaae9073c7adfed97d4703a2953e66d36bdb4037a/nerfstudio-1.1.5-py3-none-any.whl", hash = "sha256:ee6d3d360a1e363ad2f1703b602da5a8987485bff812d0ae8aa4a6e672b994c4", size = 580837, upload-time = "2024-11-11T21:22:44.733Z" },
+]
 
 [[package]]
 name = "nerfstudio-gnt"
-version = "0.0.1"
+version = "0.0.3"
 source = { editable = "." }
 dependencies = [
     { name = "lpips" },
@@ -2482,7 +2486,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "lpips", specifier = ">=0.1.4" },
-    { name = "nerfstudio", git = "https://github.com/felipe-gsilva/nerfstudio" },
+    { name = "nerfstudio" },
 ]
 
 [[package]]
@@ -2784,23 +2788,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/37/c5/286c605e087e72ad83eab130451ce13b768caa4374d926dc735edc20da5a/open3d-0.19.0-cp312-cp312-macosx_10_15_universal2.whl", hash = "sha256:9e4a8d29443ba4c83010d199d56c96bf553dd970d3351692ab271759cbe2d7ac", size = 103202754, upload-time = "2025-01-08T07:26:27.169Z" },
     { url = "https://files.pythonhosted.org/packages/2b/95/3723e5ade77c234a1650db11cbe59fe25c4f5af6c224f8ea22ff088bb36a/open3d-0.19.0-cp312-cp312-manylinux_2_31_x86_64.whl", hash = "sha256:01e4590dc2209040292ebe509542fbf2bf869ea60bcd9be7a3fe77b65bad3192", size = 447665185, upload-time = "2025-01-08T07:23:39.769Z" },
     { url = "https://files.pythonhosted.org/packages/9f/c4/35a6e0a35aa72420e75dc28d54b24beaff79bcad150423e47c67d2ad8773/open3d-0.19.0-cp312-cp312-win_amd64.whl", hash = "sha256:665839837e1d3a62524804c31031462c3b548a2b6ed55214e6deb91522844f97", size = 69169961, upload-time = "2025-01-08T07:27:35.392Z" },
-]
-
-[[package]]
-name = "opencv-python"
-version = "4.6.0.66"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/7a/1c/e57fe138615c29b8d1442009057dd420c58d4773cb16112e914c9e7b47d8/opencv-python-4.6.0.66.tar.gz", hash = "sha256:c5bfae41ad4031e66bb10ec4a0a2ffd3e514d092652781e8b1ac98d1b59f1158", size = 90296371, upload-time = "2022-06-08T09:28:40.694Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/bc/71/4575227302db0b95bbf635dd87f2c58339f84c6e63ade1afc7d332414da2/opencv_python-4.6.0.66-cp36-abi3-macosx_10_15_x86_64.whl", hash = "sha256:e6e448b62afc95c5b58f97e87ef84699e6607fe5c58730a03301c52496005cae", size = 46447284, upload-time = "2022-06-08T07:58:34.512Z" },
-    { url = "https://files.pythonhosted.org/packages/12/5d/1527327b9f7ea13bef31377f8bf399f03dc5f4f1c9f1fb69bc56b6e24cd4/opencv_python-4.6.0.66-cp36-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:5af8ba35a4fcb8913ffb86e92403e9a656a4bff4a645d196987468f0f8947875", size = 39541279, upload-time = "2022-06-08T07:57:34.854Z" },
-    { url = "https://files.pythonhosted.org/packages/af/bf/8d189a5c43460f6b5c8eb81ead8732e94b9f73ef8d9abba9e8f5a61a6531/opencv_python-4.6.0.66-cp36-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:dbdc84a9b4ea2cbae33861652d25093944b9959279200b7ae0badd32439f74de", size = 60884501, upload-time = "2022-06-08T12:01:40.475Z" },
-    { url = "https://files.pythonhosted.org/packages/fb/45/60eaff54776b73a4c69bca7669fac5c5fe61b03b80170cf0e01c2ffd846d/opencv_python-4.6.0.66-cp36-abi3-win32.whl", hash = "sha256:f482e78de6e7b0b060ff994ffd859bddc3f7f382bb2019ef157b0ea8ca8712f5", size = 26171736, upload-time = "2022-06-08T08:00:11.537Z" },
-    { url = "https://files.pythonhosted.org/packages/cf/09/b24c266cd61ddeed101b90c92a26f54d060b06f4a1b102eb891576d6e9e2/opencv_python-4.6.0.66-cp36-abi3-win_amd64.whl", hash = "sha256:0dc82a3d8630c099d2f3ac1b1aabee164e8188db54a786abb7a4e27eba309440", size = 35574793, upload-time = "2022-06-08T08:00:14.489Z" },
-    { url = "https://files.pythonhosted.org/packages/c6/00/858e894a2127b3a1b5479812b1bd3669bca64175dff4fc7c778e0a6ee565/opencv_python-4.6.0.66-cp37-abi3-macosx_11_0_arm64.whl", hash = "sha256:6e32af22e3202748bd233ed8f538741876191863882eba44e332d1a34993165b", size = 30020272, upload-time = "2022-06-08T07:58:16.165Z" },
 ]
 
 [[package]]
@@ -3153,6 +3140,18 @@ wheels = [
 ]
 
 [[package]]
+name = "plyfile"
+version = "1.1.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/78/d8/f68ec9a54568236ba4c00fc0b002f74d2a559841c1fce86ab356599da032/plyfile-1.1.3.tar.gz", hash = "sha256:1c37720cb0470b762cec2dfef573ee7996a616c359c0ec34fdd766ace3ea0634", size = 36163, upload-time = "2025-10-22T01:58:40.06Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/22/22/1755bb4c7db15bb1ed63b4eb7a7fc133bf42a3f9cc806c0d5941e107ba90/plyfile-1.1.3-py3-none-any.whl", hash = "sha256:581302f07b1c298431dcaa9038bba2ae80f3f7868b29ccb826a07bc4488ff38a", size = 36455, upload-time = "2025-10-22T01:58:38.614Z" },
+]
+
+[[package]]
 name = "pox"
 version = "0.3.7"
 source = { registry = "https://pypi.org/simple" }
@@ -3440,6 +3439,17 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/c3/b2/bc9c9196916376152d655522fdcebac55e66de6603a76a02bca1b6414f6c/pygments-2.20.0.tar.gz", hash = "sha256:6757cd03768053ff99f3039c1a36d6c0aa0b263438fcab17520b30a303a82b5f", size = 4955991, upload-time = "2026-03-29T13:29:33.898Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f4/7e/a72dd26f3b0f4f2bf1dd8923c85f7ceb43172af56d63c7383eb62b332364/pygments-2.20.0-py3-none-any.whl", hash = "sha256:81a9e26dd42fd28a23a2d169d86d7ac03b46e2f8b59ed4698fb4785f946d0176", size = 1231151, upload-time = "2026-03-29T13:29:30.038Z" },
+]
+
+[[package]]
+name = "pyliblzfse"
+version = "0.4.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/2c/ba/a4bc465d36f6aafbff89da1bf67bcc6a97475b1d2300a74a778dcb293cef/pyliblzfse-0.4.1.tar.gz", hash = "sha256:bb0b899b3830c02fdf3dbde48ea59611833f366fef836e5c32cf8145134b7d3d", size = 47666, upload-time = "2020-07-09T02:50:17.52Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/91/be/8d2ff58df014ef7a5a84befedb9573d250455ecb500cfcfeb660206fd8a6/pyliblzfse-0.4.1-cp311-cp311-macosx_10_9_universal2.whl", hash = "sha256:0ddfc3617ef8cd885ae69b5b8e852087f861dfde5c0499724085d0951fca61c4", size = 41035, upload-time = "2025-05-03T09:06:59.451Z" },
+    { url = "https://files.pythonhosted.org/packages/e0/62/f7e7a5b3c38759410a98e875239f413d472dd29a68c02e9efbeb427f6cdf/pyliblzfse-0.4.1-cp312-cp312-macosx_10_13_universal2.whl", hash = "sha256:c655027b34156cd96340a344b94d90584de67e5b70327cd47aeff69e6d3525fa", size = 40952, upload-time = "2025-05-03T08:53:30.608Z" },
+    { url = "https://files.pythonhosted.org/packages/ca/a2/f7bb1315b78d4d2e246a48ab6db44d435a110115eeffcfebec59c8fc7525/pyliblzfse-0.4.1-cp313-cp313-macosx_10_13_universal2.whl", hash = "sha256:0b5755b005af21552d8050685f2ebb5316685bc771fb9acabc950e5ffc1ee694", size = 40960, upload-time = "2025-05-03T08:53:33.235Z" },
 ]
 
 [[package]]
@@ -4826,16 +4836,16 @@ wheels = [
 
 [[package]]
 name = "viser"
-version = "1.0.0"
+version = "0.2.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "imageio" },
     { name = "msgspec" },
     { name = "nodeenv" },
     { name = "numpy" },
-    { name = "opencv-python" },
+    { name = "plyfile" },
     { name = "psutil" },
-    { name = "requests" },
+    { name = "pyliblzfse", marker = "sys_platform != 'win32'" },
     { name = "rich" },
     { name = "scikit-image" },
     { name = "scipy" },
@@ -4845,9 +4855,9 @@ dependencies = [
     { name = "websockets" },
     { name = "yourdfpy" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/66/21/31cd97b7f6dc50ea88d55039645acb9fb24a3ba1f9d15f37a17b2ebc9f1e/viser-1.0.0.tar.gz", hash = "sha256:83dd814db11e5ca818b258ff71d527c6ddf5cdba883fba28230aec69c530bd51", size = 29005083, upload-time = "2025-07-06T13:32:58.175Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/51/03/4ab0c43316c9eb6f4f4ab8fe4bc68ea3038b0750034d342f189b04252ef9/viser-0.2.7.tar.gz", hash = "sha256:6653b02e707c87f3aa7b6afbcfc4a4b96c14a699e60493f6cc8b254c1b3dc2df", size = 4532900, upload-time = "2024-08-29T20:41:23.645Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f5/db/12b285339515e61c372771909333c691e2f560b7f0047f46da41a0e33819/viser-1.0.0-py3-none-any.whl", hash = "sha256:3be881a60f0295efd8a93df97646bbc04d070ccf8d16d8faf284eb3b70eda6eb", size = 29076305, upload-time = "2025-07-06T13:32:54.195Z" },
+    { url = "https://files.pythonhosted.org/packages/1b/fe/04034c0fb25f7b823b331c20da35f6f688cadbc57c00f1e0591d88ba6caf/viser-0.2.7-py3-none-any.whl", hash = "sha256:f878846c61f066e69645fdd39a443ed307d3bc77a25b34ed845158e7ffeda32b", size = 4595037, upload-time = "2024-08-29T20:41:21.672Z" },
 ]
 
 [[package]]

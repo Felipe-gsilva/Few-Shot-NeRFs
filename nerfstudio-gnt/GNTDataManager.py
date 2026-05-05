@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from torch.utils.data import DataLoader
 from GNT.gnt.sample_ray import RaySamplerSingleImage
 from GNT.utils import cycle
@@ -11,6 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Literal, Optional, Tuple, Type, Union
 from nerfstudio.cameras.rays import RayBundle
+from nerfstudio.data.scene_box import SceneBox
 from nerfstudio.data.datamanagers.base_datamanager import (
     DataManager,
     DataManagerConfig,
@@ -156,6 +158,13 @@ class NerfstudioTransformsDataset:
         self.depth_range = torch.tensor(
             [args.nerfstudio_near_plane, args.nerfstudio_far_plane], dtype=torch.float32
         )
+        # VanillaPipeline expects datasets to expose scene_box and metadata.
+        camera_centers = np.stack([pose[:3, 3] for pose in self.poses], axis=0)
+        mins = torch.from_numpy(camera_centers.min(axis=0)).float()
+        maxs = torch.from_numpy(camera_centers.max(axis=0)).float()
+        pad = torch.maximum((maxs - mins) * 0.5, torch.tensor([1.0, 1.0, 1.0]))
+        self.scene_box = SceneBox(aabb=torch.stack([mins - pad, maxs + pad], dim=0))
+        self.metadata: Dict[str, torch.Tensor] = {}
 
     def _resolve_intrinsics(
         self, frame: dict, image_path: Path
@@ -370,21 +379,26 @@ class GNTDataManager(DataManager):
             sample_mode="uniform" if self.config.sample_mode == "all" else self.config.sample_mode,
             center_ratio=self.config.center_ratio,
         )
-        depth_range = ray_batch["depth_range"]
-        near = depth_range[:, 0:1].expand(ray_batch["ray_o"].shape[0], 1)
-        far = depth_range[:, 1:2].expand(ray_batch["ray_o"].shape[0], 1)
+        depth_range = ray_batch["depth_range"]  # (1, 2)
+        N = ray_batch["ray_o"].shape[0]
+        near = depth_range[:, 0:1].expand(N, 1)  # (N, 1)
+        far = depth_range[:, 1:2].expand(N, 1)   # (N, 1)
+        # Squeeze the DataLoader batch-size-1 leading dim from scene-context tensors.
+        # Wrap them in a SimpleNamespace so TensorDataclass._get_dict_batch_shapes
+        # skips them entirely (it only recurses into plain dicts, not arbitrary objects).
+        ctx = SimpleNamespace(
+            depth_range=depth_range.squeeze(0),          # (2,)
+            camera=ray_batch["camera"].squeeze(0),        # (34,)
+            src_rgbs=ray_batch["src_rgbs"].squeeze(0),    # (K, H, W, 3)
+            src_cameras=ray_batch["src_cameras"].squeeze(0),  # (K, 34)
+        )
         ray_bundle = RayBundle(
             origins=ray_batch["ray_o"],
             directions=ray_batch["ray_d"],
-            pixel_area=torch.ones_like(ray_batch["ray_o"][..., :1]),
+            pixel_area=torch.ones_like(ray_batch["ray_o"][..., :1]),  # (N, 1)
             nears=near,
             fars=far,
-            metadata={
-                "depth_range": depth_range,
-                "camera": ray_batch["camera"],
-                "src_rgbs": ray_batch["src_rgbs"],
-                "src_cameras": ray_batch["src_cameras"],
-            },
+            metadata={"ctx": ctx},
         )
         batch = {
             "src_rgbs": ray_batch["src_rgbs"],
@@ -400,21 +414,23 @@ class GNTDataManager(DataManager):
             val_data, self.device, render_stride=self.config.render_stride
         )
         ray_batch = ray_sampler.get_all()
-        depth_range = ray_batch["depth_range"]
-        near = depth_range[:, 0:1].expand(ray_batch["ray_o"].shape[0], 1)
-        far = depth_range[:, 1:2].expand(ray_batch["ray_o"].shape[0], 1)
+        depth_range = ray_batch["depth_range"]  # (1, 2)
+        N = ray_batch["ray_o"].shape[0]
+        near = depth_range[:, 0:1].expand(N, 1)  # (N, 1)
+        far = depth_range[:, 1:2].expand(N, 1)   # (N, 1)
+        ctx = SimpleNamespace(
+            depth_range=depth_range.squeeze(0),
+            camera=ray_batch["camera"].squeeze(0),
+            src_rgbs=ray_batch["src_rgbs"].squeeze(0),
+            src_cameras=ray_batch["src_cameras"].squeeze(0),
+        )
         ray_bundle = RayBundle(
             origins=ray_batch["ray_o"],
             directions=ray_batch["ray_d"],
-            pixel_area=torch.ones_like(ray_batch["ray_o"][..., :1]),
+            pixel_area=torch.ones_like(ray_batch["ray_o"][..., :1]),  # (N, 1)
             nears=near,
             fars=far,
-            metadata={
-                "camera": ray_batch["camera"],
-                "src_rgbs": ray_batch["src_rgbs"],
-                "src_cameras": ray_batch["src_cameras"],
-                "depth_range": depth_range,
-            },
+            metadata={"ctx": ctx},
         )
         batch = {
             "camera": ray_batch["camera"],
