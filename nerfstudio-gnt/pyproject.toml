@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
   "lpips>=0.1.4",
-  "nerfstudio @ git+https://github.com/felipe-gsilva/nerfstudio",
+  "nerfstudio",
 ]
 
 [project.entry-points."nerfstudio.method_configs"]

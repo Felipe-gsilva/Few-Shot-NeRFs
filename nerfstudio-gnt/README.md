@@ -34,16 +34,18 @@ The datamanager normalizes `data_root` to the GNT `rootdir` convention and valid
 Use the `gnt` method and set datamanager options from CLI:
 
 ```bash
-ns-train gnt --pipeline-config.datamanager-config.data-root /path/to/datasets
+ns-train gnt --pipeline.datamanager.data-root /path/to/datasets
 ```
 
 For generic Nerfstudio scenes (`images/` + `transforms.json`), use:
 
 ```bash
 ns-train gnt \
-  --pipeline-config.datamanager-config.train-dataset nerfstudio \
-  --pipeline-config.datamanager-config.eval-dataset nerfstudio \
-  --pipeline-config.datamanager-config.data-root /path/to/scene_root
+  --output-dir /path/to/outputs \
+  --vis tensorboard \
+  --pipeline.datamanager.train-dataset nerfstudio \
+  --pipeline.datamanager.eval-dataset nerfstudio \
+  --pipeline.datamanager.data-root /path/to/scene_root
 ```
 
 ## Smoke check
