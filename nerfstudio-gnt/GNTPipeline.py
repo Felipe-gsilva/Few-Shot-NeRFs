@@ -30,8 +30,10 @@ class GNTPipeline(nn.Module):
     model: GNTModel
     datamanager: GNTDataManager
 
-    def __init__(self, config: GNTPipelineConfig = GNTPipelineConfig()):
+    def __init__(self, config: GNTPipelineConfig | None = None):
         super().__init__()
+        if config is None:
+            config = GNTPipelineConfig()
         self.model = GNTModel(
             config=config.model_config,
             scene_box=config.scene_box,

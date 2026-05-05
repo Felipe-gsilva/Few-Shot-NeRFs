@@ -91,12 +91,14 @@ class GNTModel(Model):
     def __init__(
         self,
         config: GNTModelConfig,
-        scene_box: SceneBox = SceneBox(
-            aabb=torch.tensor([[-1, -1, -1], [1, 1, 1]], dtype=torch.float32)
-        ),
+        scene_box: Optional[SceneBox] = None,
         num_train_data: int = 0,
         **kwargs,
     ):
+        if scene_box is None:
+            scene_box = SceneBox(
+                aabb=torch.tensor([[-1, -1, -1], [1, 1, 1]], dtype=torch.float32)
+            )
         super().__init__(
             config=config, scene_box=scene_box, num_train_data=num_train_data, **kwargs
         )
@@ -172,10 +174,10 @@ class GNTModel(Model):
         ray_batch = {
             "ray_o": ray_bundle.origins,
             "ray_d": ray_bundle.directions,
-            "near": ray_bundle.nears,
-            "far": ray_bundle.fars,
+            "depth_range": ray_bundle.metadata["depth_range"],
             "src_rgbs": src_rgbs,
             "src_cameras": ray_bundle.metadata["src_cameras"],
+            "camera": ray_bundle.metadata["camera"],
         }
         ret = render_rays(
             ray_batch=ray_batch,
@@ -207,11 +209,33 @@ class GNTModel(Model):
     def get_image_metrics_and_images(
         self, outputs: Dict[str, torch.Tensor], batch: Dict[str, torch.Tensor]
     ) -> Tuple[Dict[str, float], Dict[str, torch.Tensor]]:
-        """Returns a dictionary of images and metrics to plot. Here you can apply your colormaps."""
+        prediction_key = "outputs_fine" if "outputs_fine" in outputs else "outputs_coarse"
+        predicted_rgb = outputs[prediction_key]["rgb"]
+        gt_rgb = batch["rgb"].to(predicted_rgb.device)
 
-        raise NotImplementedError(
-            "You need to implement this method to return the images and metrics you want to plot during training."
-        )
+        mse = torch.mean((predicted_rgb - gt_rgb) ** 2).clamp_min(1e-10)
+        psnr = -10.0 * torch.log10(mse)
+        metrics_dict = {"psnr": float(psnr.item())}
+
+        images_dict: Dict[str, torch.Tensor] = {}
+        camera = batch.get("camera")
+        if (
+            isinstance(camera, torch.Tensor)
+            and camera.numel() >= 2
+            and predicted_rgb.ndim == 2
+            and gt_rgb.ndim == 2
+        ):
+            camera_view = camera[0] if camera.ndim > 1 else camera
+            image_h = int(camera_view[0].item())
+            image_w = int(camera_view[1].item())
+            if image_h * image_w == predicted_rgb.shape[0]:
+                pred_image = predicted_rgb.reshape(image_h, image_w, 3)
+                gt_image = gt_rgb.reshape(image_h, image_w, 3)
+                images_dict["img"] = torch.cat([gt_image, pred_image], dim=1)
+                return metrics_dict, images_dict
+
+        images_dict["img"] = torch.stack([gt_rgb, predicted_rgb], dim=0)
+        return metrics_dict, images_dict
 
     def switch_to_eval(self):
         self.net_coarse.eval()
@@ -284,12 +308,3 @@ class GNTModel(Model):
             step = 0
 
         return step
-
-    def get_image_metrics_and_images(
-        self, outputs: Dict[str, torch.Tensor], batch: Dict[str, torch.Tensor]
-    ) -> Tuple[Dict[str, float], Dict[str, torch.Tensor]]:
-        """Returns a dictionary of images and metrics to plot. Here you can apply your colormaps."""
-
-        raise NotImplementedError(
-            "You need to implement this method to return the images and metrics you want to plot during training."
-        )

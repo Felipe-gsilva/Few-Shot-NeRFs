@@ -1,6 +1,7 @@
-from GNTPipeline import GNTPipeline
+from GNTConfig import GNT
+from nerfstudio.plugins.types import MethodSpecification
 
-
-pipeline = GNTPipeline()
-
-print(pipeline.get_train_loss_dict(0))
+if __name__ == "__main__":
+    assert isinstance(GNT, MethodSpecification)
+    assert GNT.config.method_name == "gnt"
+    print("GNT method specification import OK")

@@ -1,11 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "nerfstudio-gnt"
-version = "0.1.0"
-description = "Add your description here"
+version = "0.0.1"
+description = "Unnoficial Implementation for GNT (Generalizable NeRF Transformer | Varma et al) on NeRFStudio"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
   "lpips>=0.1.4",
-  "nerfstudio",
+  "nerfstudio @ git+https://github.com/felipe-gsilva/nerfstudio",
 ]
 
+[project.entry-points."nerfstudio.method_configs"]
+gnt = "GNTConfig:GNT"
+
+[tool.setuptools]
+py-modules = ["GNTConfig", "GNTDataManager", "GNTModel", "GNTPipeline", "GNTTrainer"]
+
+[tool.setuptools.packages.find]
+include = ["GNT*"]
