@@ -1086,23 +1086,6 @@ wheels = [
 ]
 
 [[package]]
-name = "gnt"
-version = "0.1.0"
-source = { git = "https://github.com/felipe-gsilva/gnt#dd0be90b80fb5f17ed60938fa7ee100838abc10d" }
-dependencies = [
-    { name = "configargparse" },
-    { name = "imageio" },
-    { name = "lpips" },
-    { name = "matplotlib" },
-    { name = "numpy" },
-    { name = "opencv-python" },
-    { name = "scikit-image" },
-    { name = "scipy" },
-    { name = "torch" },
-    { name = "torchvision" },
-]
-
-[[package]]
 name = "grpcio"
 version = "1.80.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2529,17 +2512,15 @@ wheels = [
 
 [[package]]
 name = "nerfstudio-gnt"
-version = "0.0.4"
+version = "0.0.6"
 source = { editable = "." }
 dependencies = [
-    { name = "gnt" },
     { name = "lpips" },
     { name = "nerfstudio" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "gnt", git = "https://github.com/felipe-gsilva/gnt" },
     { name = "lpips", specifier = ">=0.1.4" },
     { name = "nerfstudio" },
 ]

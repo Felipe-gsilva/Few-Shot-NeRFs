@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 from torch.utils.data import DataLoader
-from gnt.sample_ray import RaySamplerSingleImage
-from gnt.utils import cycle
+from GNT.gnt.sample_ray import RaySamplerSingleImage
+from GNT.gnt.utils import cycle
 import torch
 import numpy as np
 import copy
@@ -17,9 +17,9 @@ from nerfstudio.data.datamanagers.base_datamanager import (
     DataManager,
     DataManagerConfig,
 )
-from gnt.data_loaders.create_training_dataset import create_training_dataset
-from gnt.data_loaders import dataset_dict
-from gnt.data_loaders.data_utils import get_nearest_pose_ids
+from GNT.gnt.data_loaders.create_training_dataset import create_training_dataset
+from GNT.gnt.data_loaders import dataset_dict
+from GNT.gnt.data_loaders.data_utils import get_nearest_pose_ids
 
 DATASET_SUBDIRS = {
     "spaces": Path("data/spaces_dataset/data/800"),

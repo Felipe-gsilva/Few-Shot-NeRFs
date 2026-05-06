@@ -14,11 +14,11 @@ from typing import Dict, List, Optional, Tuple, Type, Union, cast
 from nerfstudio.models.base_model import Model, ModelConfig
 from nerfstudio.cameras.rays import RayBundle
 from torch.optim import lr_scheduler
-from gnt.feature_network import ResUNet
-from gnt.projection import Projector
 from nerfstudio.engine.callbacks import TrainingCallback, TrainingCallbackAttributes
-from gnt.transformer_network import GNT
-from gnt.render_ray import render_rays
+from GNT.gnt.feature_network import ResUNet
+from GNT.gnt.projection import Projector
+from GNT.gnt.transformer_network import GNT
+from GNT.gnt.render_ray import render_rays
 
 
 def de_parallel(model):

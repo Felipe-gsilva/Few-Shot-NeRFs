@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nerfstudio-gnt"
-version = "0.0.6"
+version = "0.0.7"
 description = "Unnoficial Implementation for GNT (Generalizable NeRF Transformer | Varma et al) on NeRFStudio"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -24,4 +24,3 @@ find = {}
 
 [tool.setuptools.package-dir]
 "gnt" = "GNT/gnt"
-"gnt.data_loaders" = "GNT/gnt/data_loaders"
