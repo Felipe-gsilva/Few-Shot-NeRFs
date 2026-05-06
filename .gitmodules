@@ -1,6 +1,6 @@
 [submodule "nerfstudio-gnt/GNT"]
 	path = nerfstudio-gnt/GNT
-	url = https://github.com/VITA-Group/GNT
+	url = https://github.com/felipe-gsilva/GNT
 [submodule "nerfstudio-pixel-nerf/pixel-nerf"]
 	path = nerfstudio-pixel-nerf/pixel-nerf
 	url = https://github.com/sxyu/pixel-nerf
@@ -10,7 +10,6 @@
 [submodule "nerfstudio-zero-1-to-3/zero123"]
 	path = nerfstudio-zero-1-to-3/zero123
 	url = https://github.com/cvlab-columbia/zero123
-
 [submodule "nerfstudio-volrecon/volrecon"]
 	path = nerfstudio-volrecon/volrecon
 	url = https://github.com/IVRL/VolRecon
