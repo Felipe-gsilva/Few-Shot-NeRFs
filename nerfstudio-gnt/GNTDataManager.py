@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 from torch.utils.data import DataLoader
-from GNT.gnt.sample_ray import RaySamplerSingleImage
-from GNT.utils import cycle
+from gnt.sample_ray import RaySamplerSingleImage
+from gnt.utils import cycle
 import torch
 import numpy as np
 import copy
@@ -17,9 +17,9 @@ from nerfstudio.data.datamanagers.base_datamanager import (
     DataManager,
     DataManagerConfig,
 )
-from GNT.gnt.data_loaders.create_training_dataset import create_training_dataset
-from GNT.gnt.data_loaders import dataset_dict
-from GNT.gnt.data_loaders.data_utils import get_nearest_pose_ids
+from gnt.data_loaders.create_training_dataset import create_training_dataset
+from gnt.data_loaders import dataset_dict
+from gnt.data_loaders.data_utils import get_nearest_pose_ids
 
 DATASET_SUBDIRS = {
     "spaces": Path("data/spaces_dataset/data/800"),
@@ -140,14 +140,18 @@ class NerfstudioTransformsDataset:
             self.intrinsics.append(intrinsics)
 
         if len(self.image_paths) < 2:
-            raise ValueError("Need at least 2 valid frames in transforms.json to select source views.")
+            raise ValueError(
+                "Need at least 2 valid frames in transforms.json to select source views."
+            )
 
         all_ids = np.arange(len(self.image_paths))
         eval_ids = all_ids[:: max(1, args.nerfstudio_eval_stride)]
         if len(eval_ids) == 0:
             eval_ids = all_ids[-1:]
         eval_set = set(eval_ids.tolist())
-        train_ids = np.array([idx for idx in all_ids.tolist() if idx not in eval_set], dtype=np.int64)
+        train_ids = np.array(
+            [idx for idx in all_ids.tolist() if idx not in eval_set], dtype=np.int64
+        )
         if len(train_ids) == 0:
             train_ids = all_ids
 
@@ -203,7 +207,9 @@ class NerfstudioTransformsDataset:
 
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor | str]:
         render_id = int(self.indices[idx])
-        rgb = imageio.imread(str(self.image_paths[render_id])).astype(np.float32) / 255.0
+        rgb = (
+            imageio.imread(str(self.image_paths[render_id])).astype(np.float32) / 255.0
+        )
         if rgb.shape[-1] > 3:
             rgb = rgb[..., :3]
 
@@ -214,14 +220,22 @@ class NerfstudioTransformsDataset:
             ([h, w], render_intrinsics.flatten(), render_pose.flatten())
         ).astype(np.float32)
 
-        candidate_ids = self.indices if self.mode == "train" else np.arange(len(self.image_paths))
+        candidate_ids = (
+            self.indices if self.mode == "train" else np.arange(len(self.image_paths))
+        )
         candidate_poses = np.stack([self.poses[int(i)] for i in candidate_ids], axis=0)
         target_pose = self.poses[render_id]
-        target_local_id = int(np.where(candidate_ids == render_id)[0][0]) if render_id in candidate_ids else -1
+        target_local_id = (
+            int(np.where(candidate_ids == render_id)[0][0])
+            if render_id in candidate_ids
+            else -1
+        )
 
         if self.mode == "train":
             subsample_factor = np.random.choice(np.arange(1, 4), p=[0.2, 0.45, 0.35])
-            max_candidates = min(self.args.num_source_views * subsample_factor, len(candidate_ids) - 1)
+            max_candidates = min(
+                self.args.num_source_views * subsample_factor, len(candidate_ids) - 1
+            )
             nearest_local_ids = get_nearest_pose_ids(
                 target_pose,
                 candidate_poses,
@@ -244,14 +258,23 @@ class NerfstudioTransformsDataset:
             num_select = min(len(nearest_local_ids), max(1, self.args.num_source_views))
 
         if len(nearest_local_ids) == 0:
-            raise ValueError("No source views available; transforms scene needs at least 2 valid frames.")
-        selected_local_ids = np.random.choice(nearest_local_ids, num_select, replace=False)
-        selected_global_ids = [int(candidate_ids[int(local_id)]) for local_id in selected_local_ids.tolist()]
+            raise ValueError(
+                "No source views available; transforms scene needs at least 2 valid frames."
+            )
+        selected_local_ids = np.random.choice(
+            nearest_local_ids, num_select, replace=False
+        )
+        selected_global_ids = [
+            int(candidate_ids[int(local_id)])
+            for local_id in selected_local_ids.tolist()
+        ]
 
         src_rgbs: List[np.ndarray] = []
         src_cameras: List[np.ndarray] = []
         for src_id in selected_global_ids:
-            src_rgb = imageio.imread(str(self.image_paths[src_id])).astype(np.float32) / 255.0
+            src_rgb = (
+                imageio.imread(str(self.image_paths[src_id])).astype(np.float32) / 255.0
+            )
             if src_rgb.shape[-1] > 3:
                 src_rgb = src_rgb[..., :3]
             src_h, src_w = src_rgb.shape[:2]
@@ -315,7 +338,9 @@ class GNTDataManager(DataManager):
 
     def _validate_dataset_path(self, dataset_name: str) -> None:
         if dataset_name == "nerfstudio":
-            transforms_path = self.config.data_root.expanduser().resolve() / "transforms.json"
+            transforms_path = (
+                self.config.data_root.expanduser().resolve() / "transforms.json"
+            )
             if transforms_path.exists():
                 return
             raise FileNotFoundError(
@@ -376,20 +401,22 @@ class GNTDataManager(DataManager):
         ray_sampler = RaySamplerSingleImage(train_data, self.device)
         ray_batch = ray_sampler.random_sample(
             self.config.train_num_rays_per_batch,
-            sample_mode="uniform" if self.config.sample_mode == "all" else self.config.sample_mode,
+            sample_mode="uniform"
+            if self.config.sample_mode == "all"
+            else self.config.sample_mode,
             center_ratio=self.config.center_ratio,
         )
         depth_range = ray_batch["depth_range"]  # (1, 2)
         N = ray_batch["ray_o"].shape[0]
         near = depth_range[:, 0:1].expand(N, 1)  # (N, 1)
-        far = depth_range[:, 1:2].expand(N, 1)   # (N, 1)
+        far = depth_range[:, 1:2].expand(N, 1)  # (N, 1)
         # Squeeze the DataLoader batch-size-1 leading dim from scene-context tensors.
         # Wrap them in a SimpleNamespace so TensorDataclass._get_dict_batch_shapes
         # skips them entirely (it only recurses into plain dicts, not arbitrary objects).
         ctx = SimpleNamespace(
-            depth_range=depth_range.squeeze(0),          # (2,)
-            camera=ray_batch["camera"].squeeze(0),        # (34,)
-            src_rgbs=ray_batch["src_rgbs"].squeeze(0),    # (K, H, W, 3)
+            depth_range=depth_range.squeeze(0),  # (2,)
+            camera=ray_batch["camera"].squeeze(0),  # (34,)
+            src_rgbs=ray_batch["src_rgbs"].squeeze(0),  # (K, H, W, 3)
             src_cameras=ray_batch["src_cameras"].squeeze(0),  # (K, 34)
         )
         ray_bundle = RayBundle(
@@ -417,7 +444,7 @@ class GNTDataManager(DataManager):
         depth_range = ray_batch["depth_range"]  # (1, 2)
         N = ray_batch["ray_o"].shape[0]
         near = depth_range[:, 0:1].expand(N, 1)  # (N, 1)
-        far = depth_range[:, 1:2].expand(N, 1)   # (N, 1)
+        far = depth_range[:, 1:2].expand(N, 1)  # (N, 1)
         ctx = SimpleNamespace(
             depth_range=depth_range.squeeze(0),
             camera=ray_batch["camera"].squeeze(0),

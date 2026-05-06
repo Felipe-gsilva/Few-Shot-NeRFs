@@ -14,11 +14,11 @@ from typing import Dict, List, Optional, Tuple, Type, Union, cast
 from nerfstudio.models.base_model import Model, ModelConfig
 from nerfstudio.cameras.rays import RayBundle
 from torch.optim import lr_scheduler
-from GNT.gnt.feature_network import ResUNet
-from GNT.gnt.projection import Projector
+from gnt.feature_network import ResUNet
+from gnt.projection import Projector
 from nerfstudio.engine.callbacks import TrainingCallback, TrainingCallbackAttributes
-from GNT.gnt.transformer_network import GNT
-from GNT.gnt.render_ray import render_rays
+from gnt.transformer_network import GNT
+from gnt.render_ray import render_rays
 
 
 def de_parallel(model):
@@ -176,9 +176,11 @@ class GNTModel(Model):
             "ray_o": ray_bundle.origins,
             "ray_d": ray_bundle.directions,
             "depth_range": ctx.depth_range.unsqueeze(0),  # render_rays expects (1, 2)
-            "src_rgbs": src_rgbs.unsqueeze(0),            # render_rays expects (1, K, H, W, 3)
-            "src_cameras": ctx.src_cameras.unsqueeze(0),  # render_rays expects (1, K, 34)
-            "camera": ctx.camera.unsqueeze(0),            # render_rays expects (1, 34)
+            "src_rgbs": src_rgbs.unsqueeze(0),  # render_rays expects (1, K, H, W, 3)
+            "src_cameras": ctx.src_cameras.unsqueeze(
+                0
+            ),  # render_rays expects (1, K, 34)
+            "camera": ctx.camera.unsqueeze(0),  # render_rays expects (1, 34)
         }
         ret = render_rays(
             ray_batch=ray_batch,
@@ -210,7 +212,9 @@ class GNTModel(Model):
     def get_image_metrics_and_images(
         self, outputs: Dict[str, torch.Tensor], batch: Dict[str, torch.Tensor]
     ) -> Tuple[Dict[str, float], Dict[str, torch.Tensor]]:
-        prediction_key = "outputs_fine" if "outputs_fine" in outputs else "outputs_coarse"
+        prediction_key = (
+            "outputs_fine" if "outputs_fine" in outputs else "outputs_coarse"
+        )
         predicted_rgb = outputs[prediction_key]["rgb"]
         gt_rgb = batch["rgb"].to(predicted_rgb.device)
 
