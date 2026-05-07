@@ -108,7 +108,7 @@ class GNTModel(Model):
 
         args = SimpleNamespace(
             netwidth=self.config.netwidth,
-            trans_depth=self.config.transdepth,
+            transdepth=self.config.transdepth,
         )
 
         self.net_coarse = GNT(
@@ -166,21 +166,40 @@ class GNTModel(Model):
         assert isinstance(ray_bundle, RayBundle), (
             "GNTModel only supports RayBundle, not Cameras"
         )
-        self.projector.device = next(self.parameters()).device
+        device = next(self.parameters()).device
+        self.projector.device = device 
 
-        ctx = ray_bundle.metadata["ctx"]
-        src_rgbs = ctx.src_rgbs  # (K, H, W, 3) — leading batch-1 dim already squeezed
-        featmaps = self.feature_net(src_rgbs.permute(0, 3, 1, 2))
+        metadata = ray_bundle.metadata or {}
+        required = ("src_rgbs", "src_cameras", "camera", "depth_range")
+        missing = [key for key in required if key not in metadata]
+        if missing:
+            raise KeyError(
+                f"Missing GNT metadata in ray bundle: {missing}. "
+                "GNTPipeline must inject source views and camera context."
+            )
+
+        src_rgbs = cast(torch.Tensor, metadata["src_rgbs"]).to(
+            device=self.device, dtype=torch.float32
+        )  # (1, K, H, W, 3)
+        src_cameras = cast(torch.Tensor, metadata["src_cameras"]).to(
+            device=self.device, dtype=torch.float32
+        )  # (1, K, 34)
+        camera = cast(torch.Tensor, metadata["camera"]).to(
+            device=self.device, dtype=torch.float32
+        )  # (1, 34)
+        depth_range = cast(torch.Tensor, metadata["depth_range"]).to(
+            device=self.device, dtype=torch.float32
+        )  # (1, 2)
+
+        featmaps = self.feature_net(src_rgbs.squeeze(0).permute(0, 3, 1, 2))
 
         ray_batch = {
             "ray_o": ray_bundle.origins,
             "ray_d": ray_bundle.directions,
-            "depth_range": ctx.depth_range.unsqueeze(0),  # render_rays expects (1, 2)
-            "src_rgbs": src_rgbs.unsqueeze(0),  # render_rays expects (1, K, H, W, 3)
-            "src_cameras": ctx.src_cameras.unsqueeze(
-                0
-            ),  # render_rays expects (1, K, 34)
-            "camera": ctx.camera.unsqueeze(0),  # render_rays expects (1, 34)
+            "depth_range": depth_range,  # (1, 2)
+            "src_rgbs": src_rgbs,  # (1, K, H, W, 3)
+            "src_cameras": src_cameras,  # (1, K, 34)
+            "camera": camera,  # (1, 34)
         }
         ret = render_rays(
             ray_batch=ray_batch,
@@ -209,38 +228,15 @@ class GNTModel(Model):
         )
         return {"rgb_loss": loss}
 
-    def get_image_metrics_and_images(
-        self, outputs: Dict[str, torch.Tensor], batch: Dict[str, torch.Tensor]
-    ) -> Tuple[Dict[str, float], Dict[str, torch.Tensor]]:
-        prediction_key = (
-            "outputs_fine" if "outputs_fine" in outputs else "outputs_coarse"
-        )
-        predicted_rgb = outputs[prediction_key]["rgb"]
-        gt_rgb = batch["rgb"].to(predicted_rgb.device)
+    def get_image_metrics_and_images(self, outputs, batch):
+        pred_key = "outputs_fine" if "outputs_fine" in outputs and outputs["outputs_fine"] is not None else "outputs_coarse"
+        predicted_rgb = outputs[pred_key]["rgb"]  # (N, 3)
+        gt_rgb = batch["rgb"].to(predicted_rgb.device)  # (N, 3)
 
         mse = torch.mean((predicted_rgb - gt_rgb) ** 2).clamp_min(1e-10)
         psnr = -10.0 * torch.log10(mse)
-        metrics_dict = {"psnr": float(psnr.item())}
 
-        images_dict: Dict[str, torch.Tensor] = {}
-        camera = batch.get("camera")
-        if (
-            isinstance(camera, torch.Tensor)
-            and camera.numel() >= 2
-            and predicted_rgb.ndim == 2
-            and gt_rgb.ndim == 2
-        ):
-            camera_view = camera[0] if camera.ndim > 1 else camera
-            image_h = int(camera_view[0].item())
-            image_w = int(camera_view[1].item())
-            if image_h * image_w == predicted_rgb.shape[0]:
-                pred_image = predicted_rgb.reshape(image_h, image_w, 3)
-                gt_image = gt_rgb.reshape(image_h, image_w, 3)
-                images_dict["img"] = torch.cat([gt_image, pred_image], dim=1)
-                return metrics_dict, images_dict
-
-        images_dict["img"] = torch.stack([gt_rgb, predicted_rgb], dim=0)
-        return metrics_dict, images_dict
+        return {"psnr": float(psnr.item())}, {"rgb": predicted_rgb, "rgb_gt": gt_rgb}
 
     def switch_to_eval(self):
         self.net_coarse.eval()
@@ -256,29 +252,20 @@ class GNTModel(Model):
 
     def save_model(self, filename):
         to_save = {
-            "optimizer": self.optimizer.state_dict(),
-            "scheduler": self.scheduler.state_dict(),
             "net_coarse": de_parallel(self.net_coarse).state_dict(),
             "feature_net": de_parallel(self.feature_net).state_dict(),
         }
-
         if self.net_fine is not None:
             to_save["net_fine"] = de_parallel(self.net_fine).state_dict()
+        torch.save(to_save, filename)
 
         torch.save(to_save, filename)
 
-    def load_model(self, filename, load_opt=True, load_scheduler=True):
-        to_load = torch.load(filename, map_location=self.device)
-
-        if load_opt:
-            self.optimizer.load_state_dict(to_load["optimizer"])
-        if load_scheduler:
-            self.scheduler.load_state_dict(to_load["scheduler"])
-
+    def load_model(self, filename):
+        to_load = torch.load(filename, map_location="cpu")
         self.net_coarse.load_state_dict(to_load["net_coarse"])
         self.feature_net.load_state_dict(to_load["feature_net"])
-
-        if self.net_fine is not None and "net_fine" in to_load.keys():
+        if self.net_fine is not None and "net_fine" in to_load:
             self.net_fine.load_state_dict(to_load["net_fine"])
 
     def load_from_ckpt(
@@ -305,7 +292,7 @@ class GNTModel(Model):
 
         if len(ckpts) > 0 and not self.config.no_reload:
             fpath = ckpts[-1]
-            self.load_model(fpath, load_opt, load_scheduler)
+            self.load_model(fpath)
             step = int(fpath[-10:-4])
             print("Reloading from {}, starting at step={}".format(fpath, step))
         else:

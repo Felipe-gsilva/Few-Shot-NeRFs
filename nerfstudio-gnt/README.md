@@ -14,20 +14,10 @@ uv pip install -e .
 ns-train --help | grep -i gnt
 ```
 
-## Dataset root (`data_root`)
+## Dataset format
 
-Upstream GNT loaders expect paths like:
-
-- `.../data/real_iconic_noface` (llff)
-- `.../data/nerf_synthetic`
-- `.../data/google_scanned_objects`
-
-In this integration, `data_root` should point to either:
-
-1. The parent directory of `data/` (recommended), or
-2. The `data/` directory itself.
-
-The datamanager normalizes `data_root` to the GNT `rootdir` convention and validates expected dataset folders before training.
+This integration uses Nerfstudio's native `VanillaDataManager` with `NerfstudioDataParserConfig`.
+Point the dataparser to a scene root containing `transforms.json`.
 
 ## Configure GNT
 
@@ -37,21 +27,17 @@ Use the `gnt` method and set datamanager options from CLI:
 ns-train gnt --pipeline.datamanager.data-root /path/to/datasets
 ```
 
-For generic Nerfstudio scenes (`images/` + `transforms.json`), use:
-
 ```bash
 ns-train gnt \
   --output-dir /path/to/outputs \
   --vis tensorboard \
-  --pipeline.datamanager.train-dataset nerfstudio \
-  --pipeline.datamanager.eval-dataset nerfstudio \
-  --pipeline.datamanager.data-root /path/to/scene_root
+  --pipeline.datamanager.dataparser.data /path/to/scene_root
 ```
 
 ## Smoke check
 
 ```bash
-python test.py
+python test.py /path/to/scene_root/transforms.json
 ```
 
-This validates that the exported method specification can be imported and resolved.
+This runs one train step through `GNTPipeline.get_train_loss_dict` and checks source-view tensor shapes.

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nerfstudio-pixel-nerf"
-version = "0.0.7"
-description = "Unnoficial Implementation for GNT (Generalizable NeRF Transformer | Varma et al) on NeRFStudio"
+version = "0.0.1"
+description = "Unnoficial Implementation for `pixelNeRF: Neural Radiance Fields from One or Few Images` [Alex et al.] for NeRFStudio"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -14,13 +14,14 @@ dependencies = [
 ]
 
 [project.entry-points."nerfstudio.method_configs"]
-gnt = "PixelNeRFConfig:PixelNeRF"
+pixel-nerf = "PixelNeRFConfig:PixelNeRF"
 
 [tool.setuptools]
-py-modules = [""]
+py-modules = ["PixelNeRFConfig", "PixelNeRFModel"]
 
 [tool.setuptools.packages]
-find = {}
+find = { }
+
 
 [tool.setuptools.package-dir]
-"gnt" = "GNT/gnt"
+"pixel_nerf" = "pixel-nerf"

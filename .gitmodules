@@ -1,15 +1,15 @@
 [submodule "nerfstudio-gnt/GNT"]
 	path = nerfstudio-gnt/GNT
 	url = https://github.com/felipe-gsilva/GNT
-[submodule "nerfstudio-pixel-nerf/pixel-nerf"]
-	path = nerfstudio-pixel-nerf/pixel-nerf
-	url = https://github.com/sxyu/pixel-nerf
+[submodule "nerfstudio-pixel-nerf/pixelnerf"]
+  path = nerfstudio-pixel-nerf/pixelnerf
+  url = https://github.com/sxyu/pixel-nerf
 [submodule "nerfstudio-ibrnet/ibrnet"]
-	path = nerfstudio-ibrnet/ibrnet
-	url = https://github.com/googleinterns/ibrnet
+  path = nerfstudio-ibrnet/ibrnet
+  url = https://github.com/googleinterns/ibrnet
 [submodule "nerfstudio-zero-1-to-3/zero123"]
-	path = nerfstudio-zero-1-to-3/zero123
-	url = https://github.com/cvlab-columbia/zero123
+  path = nerfstudio-zero-1-to-3/zero123
+  url = https://github.com/cvlab-columbia/zero123
 [submodule "nerfstudio-volrecon/volrecon"]
-	path = nerfstudio-volrecon/volrecon
-	url = https://github.com/IVRL/VolRecon
+  path = nerfstudio-volrecon/volrecon
+  url = https://github.com/IVRL/VolRecon
