@@ -16,6 +16,7 @@ from nerfstudio.utils import profiler
 
 from PixelNerfModel import PixelNerfModelConfig
 
+
 @dataclass
 class PixelNerfPipelineConfig(VanillaPipelineConfig):
     _target: Type = field(default_factory=lambda: PixelNerfPipeline)
