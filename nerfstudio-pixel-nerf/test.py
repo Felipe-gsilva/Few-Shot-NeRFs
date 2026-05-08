@@ -1,4 +1,4 @@
-from PixelNeRFConfig import PixelNeRF 
+from PixelNeRFConfig import PixelNeRF
 
 if __name__ == "__main__":
     # Test if the config can be instantiated without errors

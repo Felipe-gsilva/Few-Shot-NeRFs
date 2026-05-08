@@ -111,9 +111,7 @@ class PixelNeRFModel(Model):
             )
         return {"rgb_loss": loss}
 
-    def get_metrics(
-        self, outputs, batch
-    ) -> Dict[str, torch.Tensor]:
+    def get_metrics(self, outputs, batch) -> Dict[str, torch.Tensor]:
         """The paper only reports PSNR, but you can add more metrics here if you want."""
         pred = outputs.get("rgb_fine", outputs["rgb_coarse"])
         gt = batch["rgb"].to(pred.device)
@@ -151,19 +149,25 @@ class PixelNeRFModel(Model):
         return 0
 
     @profiler.time_function
-    def get_outputs(self, ray_bundle: RayBundle | Cameras) -> Dict[str, torch.Tensor | List]:
+    def get_outputs(
+        self, ray_bundle: RayBundle | Cameras
+    ) -> Dict[str, torch.Tensor | List]:
         assert isinstance(ray_bundle, RayBundle)
         device = next(self.net.parameters()).device
         metadata = ray_bundle.metadata or {}
 
         for key in ("src_rgbs", "src_cameras", "focal", "c"):
             if key not in metadata:
-                raise KeyError(f"Missing metadata key '{key}' — pipeline must inject source views")
+                raise KeyError(
+                    f"Missing metadata key '{key}' — pipeline must inject source views"
+                )
 
-        src_images = metadata["src_rgbs"].squeeze(0).permute(0, 3, 1, 2).to(device)  # (NS, 3, H, W)
-        src_poses  = metadata["src_cameras"].squeeze(0).to(device)                    # (NS, 4, 4)
-        focal      = metadata["focal"].to(device)                                     # (NS, 2)
-        c          = metadata["c"].to(device)                                         # (NS, 2)
+        src_images = (
+            metadata["src_rgbs"].squeeze(0).permute(0, 3, 1, 2).to(device)
+        )  # (NS, 3, H, W)
+        src_poses = metadata["src_cameras"].squeeze(0).to(device)  # (NS, 4, 4)
+        focal = metadata["focal"].to(device)  # (NS, 2)
+        c = metadata["c"].to(device)  # (NS, 2)
 
         self.net.encode(
             src_images.unsqueeze(0),
@@ -172,27 +176,32 @@ class PixelNeRFModel(Model):
             c=c,
         )
 
-        rays = torch.cat([
-            ray_bundle.origins.to(device),
-            ray_bundle.directions.to(device),
-            ray_bundle.nears.to(device),
-            ray_bundle.fars.to(device),
-        ], dim=-1).unsqueeze(0)
+        rays = torch.cat(
+            [
+                ray_bundle.origins.to(device),
+                ray_bundle.directions.to(device),
+                ray_bundle.nears.to(device),
+                ray_bundle.fars.to(device),
+            ],
+            dim=-1,
+        ).unsqueeze(0)
 
         render_dict = DotMap(self.renderer(rays, want_weights=True))
 
         outputs: Dict[str, torch.Tensor | List] = {
-            "rgb_coarse":     render_dict.coarse.rgb.squeeze(0),
-            "depth_coarse":   render_dict.coarse.depth.squeeze(0),
+            "rgb_coarse": render_dict.coarse.rgb.squeeze(0),
+            "depth_coarse": render_dict.coarse.depth.squeeze(0),
             "weights_coarse": render_dict.coarse.weights.squeeze(0),
         }
         if len(render_dict.fine) > 0:
-            outputs["rgb_fine"]     = render_dict.fine.rgb.squeeze(0)
-            outputs["depth_fine"]   = render_dict.fine.depth.squeeze(0)
+            outputs["rgb_fine"] = render_dict.fine.rgb.squeeze(0)
+            outputs["depth_fine"] = render_dict.fine.depth.squeeze(0)
             outputs["weights_fine"] = render_dict.fine.weights.squeeze(0)
 
         outputs["rgb"] = outputs.get("rgb_fine", outputs["rgb_coarse"])
-        outputs["accumulation"] = outputs.get("weights_fine", outputs["weights_coarse"]).sum(dim=-1)
+        outputs["accumulation"] = outputs.get(
+            "weights_fine", outputs["weights_coarse"]
+        ).sum(dim=-1)
         outputs["depth"] = outputs.get("depth_fine", outputs["depth_coarse"])
 
         return cast(Dict[str, torch.Tensor | List], outputs)

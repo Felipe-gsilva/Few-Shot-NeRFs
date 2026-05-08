@@ -33,5 +33,5 @@ PixelNeRF = MethodSpecification(
         viewer=ViewerConfig(num_rays_per_chunk=1 << 11),
         vis="tensorboard",
     ),
-    description="Configuration for the PixelNeRF method"
+    description="Configuration for the PixelNeRF method",
 )
