@@ -1,24 +1,24 @@
-"""nerstudio-gnt/GNTConfig.py"""
+"""nerstudio-pixel-nerf/PixelNeRF.py"""
 
+from PixelNeRFDataManager import PixelNeRFDataManagerConfig
 from PixelNeRFModel import PixelNeRFModelConfig
 from nerfstudio.configs.base_config import ViewerConfig
-from nerfstudio.data.datamanagers.base_datamanager import DataManagerConfig
 from nerfstudio.engine.optimizers import AdamOptimizerConfig
 from nerfstudio.engine.schedulers import ExponentialDecaySchedulerConfig
 from nerfstudio.engine.trainer import TrainerConfig
-from nerfstudio.pipelines.base_pipeline import VanillaPipelineConfig
 from nerfstudio.plugins.types import MethodSpecification
+from PixelNerfPipeline import PixelNerfPipelineConfig
 
 
-GNT = MethodSpecification(
+PixelNeRF = MethodSpecification(
     config=TrainerConfig(
-        method_name="gnt",
+        method_name="pixel-nerf",
         steps_per_eval_batch=500,
         steps_per_save=2000,
         max_num_iterations=300000,
         mixed_precision=True,
-        pipeline=VanillaPipelineConfig(
-            datamanager=DataManagerConfig(),
+        pipeline=PixelNerfPipelineConfig(
+            datamanager=PixelNeRFDataManagerConfig(),
             model=PixelNeRFModelConfig(),
         ),
         optimizers={
@@ -30,8 +30,8 @@ GNT = MethodSpecification(
                 ),
             },
         },
-        viewer=ViewerConfig(num_rays_per_chunk=1 << 15),
+        viewer=ViewerConfig(num_rays_per_chunk=1 << 11),
         vis="tensorboard",
     ),
-    description="Configuration for the GNT method.",
+    description="Configuration for the PixelNeRF method"
 )

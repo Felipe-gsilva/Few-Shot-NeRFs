@@ -9,16 +9,17 @@ description = "Unofficial Implementation of `pixelNeRF: Neural Radiance Fields f
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+  "dotmap>=1.3.30",
   "lpips>=0.1.4",
   "nerfstudio",
   "pyhocon>=0.3.63",
 ]
 
 [project.entry-points."nerfstudio.method_configs"]
-pixelnerf = "PixelNeRFConfig:pixelnerf_method"
+pixelnerf = "PixelNeRFConfig:PixelNeRF"
 
 [tool.setuptools]
-py-modules = ["PixelNeRFConfig", "PixelNeRFModel", "PixelNeRFPipeline"]
+py-modules = ["PixelNeRFConfig", "PixelNeRFModel", "PixelNeRFPipeline", "PixelNeRFDataManager"]
 
 [tool.setuptools.packages.find]
 where = ["."]
