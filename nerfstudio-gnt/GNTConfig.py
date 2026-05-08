@@ -7,7 +7,7 @@ from nerfstudio.plugins.types import MethodSpecification
 from GNTPipeline import GNTPipelineConfig
 from GNTModel import GNTModelConfig
 
-gnt_method = MethodSpecification(
+GNT = MethodSpecification(
     config=TrainerConfig(
         method_name="gnt",
         pipeline=GNTPipelineConfig(
