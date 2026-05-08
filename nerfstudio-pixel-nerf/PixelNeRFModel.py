@@ -1,12 +1,11 @@
-import sys
-import os
 from pathlib import Path
+import sys
 
-pixelnerf_src_root = str(Path(__file__).parent / "pixelnerf" / "src") 
+production_pixelnerf_src = str(Path(__file__).parent / "pixelnerf" / "src")
+if production_pixelnerf_src not in sys.path:
+    sys.path.insert(0, production_pixelnerf_src)
 
-if pixelnerf_src_root not in sys.path:
-    sys.path.insert(0, pixelnerf_src_root)
-
+import os
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Type, Tuple, cast
 from nerfstudio.cameras.cameras import Cameras
