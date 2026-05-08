@@ -17,6 +17,7 @@ from nerfstudio.models.base_model import Model, ModelConfig
 from torch.nn import Parameter
 from pixelnerf.src.model.models import PixelNeRFNet
 from pixelnerf.src.render import NeRFRenderer
+from pyhocon import ConfigFactory
 from dotmap import DotMap
 
 import os
@@ -75,17 +76,15 @@ class PixelNeRFModel(Model):
     def populate_modules(self):
         super().populate_modules()
 
-        if dataclasses.is_dataclass(self.config):
+        if dataclasses.is_dataclass(self.config) and not isinstance(self.config, type):
             conf_dict = dataclasses.asdict(self.config)
         else:
             conf_dict = vars(self.config)
 
-        self.net = PixelNeRFNet(conf_dict["encoder"])
+        pixelnerf_conf = ConfigFactory.from_dict(conf_dict)
 
-        self.renderer = NeRFRenderer.from_conf(
-            conf_dict["renderer"],
-            lindisp=self.config.lindisp,
-        )
+        self.net = PixelNeRFNet(pixelnerf_conf)
+        self.renderer = NeRFRenderer.from_conf(pixelnerf_conf)
 
         if torch.cuda.is_available():
             print(f"Using {torch.cuda.device_count()} GPUs for parallelization")
@@ -93,10 +92,10 @@ class PixelNeRFModel(Model):
                 self.net, gpus=list(range(torch.cuda.device_count()))
             ).eval()
 
-        if self.config.no_reload:
+        if self.config.no_reload: # type: ignore
             print("Not loading from ckpt, training from scratch...")
         else:
-            self.load_from_ckpt(self.config.out_dir, force_latest=False)
+            self.load_from_ckpt(self.config.out_dir, force_latest=False) # type: ignore
 
     def get_param_groups(self) -> Dict[str, List[Parameter]]:
         return {"network": list(self.net.parameters())}
