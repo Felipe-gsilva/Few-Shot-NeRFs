@@ -33,7 +33,6 @@ class PixelNeRFDataManager(VanillaDataManager):
         test_mode: Literal["test", "val", "inference"] = "val",
         **kwargs,
     ):
-        # 1. Chame o super() para herdar todo o carregamento de dataset do Nerfstudio!
         super().__init__(config=config, device=device, test_mode=test_mode, **kwargs)
 
     def _sample_source_views(self, num_views: int) -> Dict[str, torch.Tensor]:
@@ -72,19 +71,18 @@ class PixelNeRFDataManager(VanillaDataManager):
         }
 
     def next_train(self, step: int) -> Tuple[RayBundle, Dict]:
-        ray_bundle, batch = self.train_pixel_sampler.sample(
-            self.config.train_num_rays_per_batch
-        )
+        image_batch = next(self.iter_train_image_dataloader)
+        ray_bundle, batch = self.train_pixel_sampler.sample(image_batch)
         source_data = self._sample_source_views(self.config.num_source_views)
         ray_bundle.metadata.update(source_data)
 
         return ray_bundle, batch
 
     def next_eval(self, step: int) -> Tuple[RayBundle, Dict]:
-        """A mesma lógica de next_train, mas usando o eval_pixel_sampler."""
-        ray_bundle, batch = self.eval_pixel_sampler.sample(
-            self.config.eval_num_rays_per_batch
-        )
+        """A mesma lógica de next_train, mas usando o eval_pixel_sampler e o eval dataloader."""
+        image_batch = next(self.iter_eval_image_dataloader)
+        ray_bundle, batch = self.eval_pixel_sampler.sample(image_batch)
         source_data = self._sample_source_views(self.config.num_source_views)
         ray_bundle.metadata.update(source_data)
+        
         return ray_bundle, batch
