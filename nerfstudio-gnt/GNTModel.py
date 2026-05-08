@@ -107,7 +107,7 @@ class GNTModel(Model):
 
         args = SimpleNamespace(
             netwidth=self.config.netwidth,
-            transdepth=self.config.transdepth,
+            trans_depth=self.config.transdepth,
         )
 
         self.net_coarse = GNT(
