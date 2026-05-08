@@ -29,7 +29,9 @@ def main() -> None:
     if transforms_json.name != "transforms.json":
         raise ValueError("Expected a path to transforms.json.")
     if not transforms_json.exists():
-        raise FileNotFoundError(f"Could not find transforms.json at '{transforms_json}'.")
+        raise FileNotFoundError(
+            f"Could not find transforms.json at '{transforms_json}'."
+        )
 
     scene_root = transforms_json.parent
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -46,7 +48,9 @@ def main() -> None:
             single_net=True,
         ),
     )
-    pipeline = pipeline_config.setup(device=device, test_mode="val", world_size=1, local_rank=0)
+    pipeline = pipeline_config.setup(
+        device=device, test_mode="val", world_size=1, local_rank=0
+    )
 
     ray_bundle, batch = pipeline.datamanager.next_train(step=0)
     target_idx = pipeline._extract_target_image_idx(batch)
@@ -67,4 +71,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

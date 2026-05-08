@@ -17,7 +17,9 @@ from nerfstudio.utils import profiler
 from GNTModel import GNTModelConfig
 
 
-def cameras_to_gnt_format(cameras: Cameras, image_idx: int, device: torch.device) -> torch.Tensor:
+def cameras_to_gnt_format(
+    cameras: Cameras, image_idx: int, device: torch.device
+) -> torch.Tensor:
     """Convert one Nerfstudio camera entry to GNT's 34D camera vector.
 
     Layout matches GNT projector expectations exactly:
@@ -66,7 +68,11 @@ class GNTPipeline(VanillaPipeline):
     def _extract_target_image_idx(self, batch: Dict) -> int:
         if "image_idx" in batch:
             image_idx = batch["image_idx"]
-            return int(image_idx.reshape(-1)[0].item() if torch.is_tensor(image_idx) else image_idx)
+            return int(
+                image_idx.reshape(-1)[0].item()
+                if torch.is_tensor(image_idx)
+                else image_idx
+            )
 
         if "indices" in batch:
             indices = batch["indices"]
@@ -81,7 +87,11 @@ class GNTPipeline(VanillaPipeline):
     def _sample_source_views(
         self, target_image_idx: int, split: Literal["train", "eval"]
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        dataset = self.datamanager.train_dataset if split == "train" else self.datamanager.eval_dataset
+        dataset = (
+            self.datamanager.train_dataset
+            if split == "train"
+            else self.datamanager.eval_dataset
+        )
         cameras = dataset.cameras
         device = next(self.model.parameters()).device
         num_images = int(cameras.camera_to_worlds.shape[0])
@@ -94,7 +104,9 @@ class GNTPipeline(VanillaPipeline):
         if source_candidates.numel() == 0:
             raise ValueError("No source views available after excluding target image.")
 
-        num_src = min(int(self.model.config.num_source_views), int(source_candidates.numel()))
+        num_src = min(
+            int(self.model.config.num_source_views), int(source_candidates.numel())
+        )
         perm = torch.randperm(source_candidates.numel(), device=device)[:num_src]
         source_indices = source_candidates[perm]
 
@@ -115,8 +127,12 @@ class GNTPipeline(VanillaPipeline):
 
             src_cameras.append(cameras_to_gnt_format(cameras, src_idx, device=device))
 
-        src_rgbs_tensor = torch.stack(src_rgbs, dim=0).unsqueeze(0)  # (1, N_src, H, W, 3)
-        src_cameras_tensor = torch.stack(src_cameras, dim=0).unsqueeze(0)  # (1, N_src, 34)
+        src_rgbs_tensor = torch.stack(src_rgbs, dim=0).unsqueeze(
+            0
+        )  # (1, N_src, H, W, 3)
+        src_cameras_tensor = torch.stack(src_cameras, dim=0).unsqueeze(
+            0
+        )  # (1, N_src, 34)
         return src_rgbs_tensor, src_cameras_tensor
 
     @profiler.time_function
@@ -127,11 +143,19 @@ class GNTPipeline(VanillaPipeline):
         target_idx = self._extract_target_image_idx(batch)
         src_rgbs, src_cameras = self._sample_source_views(target_idx, split=split)
 
-        dataset = self.datamanager.train_dataset if split == "train" else self.datamanager.eval_dataset
-        camera = cameras_to_gnt_format(dataset.cameras, target_idx, device=device).unsqueeze(0)  # (1, 34)
-        depth_range = torch.stack(
-            [ray_bundle.nears.min(), ray_bundle.fars.max()], dim=0
-        ).to(device=device, dtype=torch.float32).unsqueeze(0)  # (1, 2)
+        dataset = (
+            self.datamanager.train_dataset
+            if split == "train"
+            else self.datamanager.eval_dataset
+        )
+        camera = cameras_to_gnt_format(
+            dataset.cameras, target_idx, device=device
+        ).unsqueeze(0)  # (1, 34)
+        depth_range = (
+            torch.stack([ray_bundle.nears.min(), ray_bundle.fars.max()], dim=0)
+            .to(device=device, dtype=torch.float32)
+            .unsqueeze(0)
+        )  # (1, 2)
 
         metadata = dict(ray_bundle.metadata) if ray_bundle.metadata is not None else {}
         metadata["src_rgbs"] = src_rgbs

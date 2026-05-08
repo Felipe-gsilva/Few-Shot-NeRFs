@@ -10,10 +10,9 @@ import torch
 from dataclasses import dataclass, field
 from nerfstudio.cameras.cameras import Cameras
 from torch.nn import Parameter
-from typing import Dict, List, Optional, Tuple, Type, Union, cast
+from typing import Dict, List, Optional, Type, cast
 from nerfstudio.models.base_model import Model, ModelConfig
 from nerfstudio.cameras.rays import RayBundle
-from torch.optim import lr_scheduler
 from nerfstudio.engine.callbacks import TrainingCallback, TrainingCallbackAttributes
 from GNT.gnt.feature_network import ResUNet
 from GNT.gnt.projection import Projector
@@ -148,11 +147,12 @@ class GNTModel(Model):
 
     def get_param_groups(self) -> Dict[str, List[Parameter]]:
         """Returns the parameter groups needed to optimizer your model components."""
-        return {
+        param_groups = {
             "network": list(self.net_coarse.parameters())
-            + list(self.feature_net.parameters())
-            + (list(self.net_fine.parameters()) if self.net_fine else [])
+            + (list(self.net_fine.parameters()) if self.net_fine else []),
+            "feature_net": list(self.feature_net.parameters()),
         }
+        return param_groups
 
     def get_training_callbacks(
         self, training_callback_attributes: TrainingCallbackAttributes
@@ -167,7 +167,7 @@ class GNTModel(Model):
             "GNTModel only supports RayBundle, not Cameras"
         )
         device = next(self.parameters()).device
-        self.projector.device = device 
+        self.projector.device = device
 
         metadata = ray_bundle.metadata or {}
         required = ("src_rgbs", "src_cameras", "camera", "depth_range")
@@ -215,10 +215,41 @@ class GNTModel(Model):
             single_net=self.config.single_net,
         )
 
+        if "outputs_fine" in ret and ret["outputs_fine"] is not None:
+            ret["rgb"] = ret["outputs_fine"]["rgb"]
+            ret["depth"] = (
+                ret["outputs_fine"]["depth"]
+                if "depth" in ret["outputs_fine"]
+                else ret["outputs_fine"]["z_vals"]
+            )
+        elif "outputs_coarse" in ret and ret["outputs_coarse"] is not None:
+            ret["rgb"] = ret["outputs_coarse"]["rgb"]
+            ret["depth"] = (
+                ret["outputs_coarse"]["depth"]
+                if "depth" in ret["outputs_coarse"]
+                else ret["outputs_coarse"]["z_vals"]
+            )
+        else:
+            raise ValueError(
+                "render_rays must return at least 'outputs_coarse' with 'rgb' and 'depth' or 'z_vals'."
+            )
+
         return cast(Dict[str, torch.Tensor | List], ret)
 
     def get_metrics_dict(self, outputs, batch) -> Dict[str, torch.Tensor]:
-        return {}
+        metrics_dict = {}
+        if "outputs_fine" in outputs and outputs["outputs_fine"] is not None:
+            predicted_rgb = outputs["outputs_fine"]["rgb"]
+        else:
+            predicted_rgb = outputs["outputs_coarse"]["rgb"]
+
+        gt_rgb = batch["rgb"].to(predicted_rgb.device)
+        mse = torch.nn.functional.mse_loss(predicted_rgb, gt_rgb)
+        psnr = -10.0 * torch.log10(mse.clamp_min(1e-10))
+
+        metrics_dict["psnr"] = psnr
+
+        return metrics_dict
 
     def get_loss_dict(
         self, outputs, batch, metrics_dict=None
@@ -229,7 +260,11 @@ class GNTModel(Model):
         return {"rgb_loss": loss}
 
     def get_image_metrics_and_images(self, outputs, batch):
-        pred_key = "outputs_fine" if "outputs_fine" in outputs and outputs["outputs_fine"] is not None else "outputs_coarse"
+        pred_key = (
+            "outputs_fine"
+            if "outputs_fine" in outputs and outputs["outputs_fine"] is not None
+            else "outputs_coarse"
+        )
         predicted_rgb = outputs[pred_key]["rgb"]  # (N, 3)
         gt_rgb = batch["rgb"].to(predicted_rgb.device)  # (N, 3)
 

@@ -7,4 +7,3 @@ from nerfstudio.data.datamanagers.base_datamanager import (
 
 GNTDataManager = VanillaDataManager
 GNTDataManagerConfig = VanillaDataManagerConfig
-
