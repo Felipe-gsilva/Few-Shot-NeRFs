@@ -46,6 +46,21 @@ class PixelNeRFModelConfig(ModelConfig):
             "help": "Configuration for the pixelNeRF encoder. Currently using the paper default configuration"
         },
     )
+    mlp_coarse: Dict[str, Any] = field(
+        default_factory=lambda: {
+            "type": "resnet",
+            "n_blocks": 3,
+            "d_hidden": 512,
+        },
+    )
+
+    mlp_fine: Dict[str, Any] = field(
+        default_factory=lambda: {
+            "type": "resnet",
+            "n_blocks": 4,
+            "d_hidden": 512,
+        },
+    )
     renderer: Dict[str, Any] = field(
         default_factory=lambda: {
             "n_coarse": 64,
@@ -58,12 +73,24 @@ class PixelNeRFModelConfig(ModelConfig):
             "help": "Configuration for the pixelNeRF renderer. Currently using the paper default configuration"
         },
     )
+    loss: Dict[str, Any] = field(
+        default_factory=lambda: {
+            "rgb": {"use_l1": False},
+            "rgb_fine": {"use_l1": False},
+            "alpha": {
+                "lambda_alpha": 0.0, "clamp_alpha": 100, "init_epoch": 5
+            },
+        },
+        metadata={
+            "help": "Configuration for the pixelNeRF loss. Currently using the paper default configuration "
+        })
     lindisp: bool = False
     """Whether to sample linearly in disparity (inverse depth) rather than depth. Paper defines it troughout dataset preprocessing, so we keep it as a config option but set it to False by default since it's not commonly used in nerf implementations."""
 
 
 class PixelNeRFModel(Model):
     config: PixelNeRFModelConfig
+
     def __init__(self, config, scene_box=None, num_train_data=0, **kwargs):
         if scene_box is None:
             scene_box = SceneBox(
@@ -92,10 +119,10 @@ class PixelNeRFModel(Model):
                 self.net, gpus=list(range(torch.cuda.device_count()))
             ).eval()
 
-        if self.config.no_reload: # type: ignore
+        if self.config.no_reload:  # type: ignore
             print("Not loading from ckpt, training from scratch...")
         else:
-            self.load_from_ckpt(self.config.out_dir, force_latest=False) # type: ignore
+            self.load_from_ckpt(self.config.out_dir, force_latest=False)  # type: ignore
 
     def get_param_groups(self) -> Dict[str, List[Parameter]]:
         return {"network": list(self.net.parameters())}
