@@ -1,3 +1,4 @@
+import dataclasses
 from pathlib import Path
 import sys
 
@@ -62,7 +63,6 @@ class PixelNeRFModelConfig(ModelConfig):
 
 class PixelNeRFModel(Model):
     config: PixelNeRFModelConfig
-
     def __init__(self, config, scene_box=None, num_train_data=0, **kwargs):
         if scene_box is None:
             scene_box = SceneBox(
@@ -74,10 +74,16 @@ class PixelNeRFModel(Model):
 
     def populate_modules(self):
         super().populate_modules()
-        self.net = PixelNeRFNet(self.config)
+
+        if dataclasses.is_dataclass(self.config):
+            conf_dict = dataclasses.asdict(self.config)
+        else:
+            conf_dict = vars(self.config)
+
+        self.net = PixelNeRFNet(conf_dict["encoder"])
 
         self.renderer = NeRFRenderer.from_conf(
-            self.config.renderer,
+            conf_dict["renderer"],
             lindisp=self.config.lindisp,
         )
 
