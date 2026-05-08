@@ -3,6 +3,7 @@ from typing import Dict, Literal, Tuple, Type, Union
 from nerfstudio.cameras.rays import RayBundle
 from nerfstudio.data.datamanagers.base_datamanager import (
     VanillaDataManager,
+    VanillaDataManagerConfig,
 )
 
 import random
@@ -10,7 +11,7 @@ import torch
 
 
 @dataclass
-class PixelNeRFDataManagerConfig(VanillaDataManager):
+class PixelNeRFDataManagerConfig(VanillaDataManagerConfig):
     """Configuration for the GNT data manager.
 
     Args:

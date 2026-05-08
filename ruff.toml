@@ -1,7 +1,7 @@
 exclude = [
   "nerfstudio-gnt/GNT",
   "nerfstudio-ibrnet/ibrnet",
-  "nerfstudio-pixel-nerf/pixel-nerf",
+  "nerfstudio-pixel-nerf/pixelnerf",
   "nerfstudio-volrecon/volrecon",
   "nerfstudio-zero-1-to-3/zero123"
 ]
