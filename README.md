@@ -6,6 +6,7 @@ a NeRFStudio unnoficial implementation for:
 - [X] GNT
 - [X] PixelNeRF
 - [ ] VolRecon
+- [ ] Zero123
 
 this repo (each impl) will later be added into PyPi for those who want to import and use it alongside you default nerfstudio env
 
