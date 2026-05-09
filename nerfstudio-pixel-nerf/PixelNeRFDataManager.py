@@ -72,17 +72,19 @@ class PixelNeRFDataManager(VanillaDataManager):
 
     def next_train(self, step: int) -> Tuple[RayBundle, Dict]:
         image_batch = next(self.iter_train_image_dataloader)
-        ray_bundle, batch = self.train_pixel_sampler.sample(image_batch)
+        batch = self.train_pixel_sampler.sample(image_batch)
+        ray_indices = batch["indices"]
+        ray_bundle = self.train_ray_generator(ray_indices)
         source_data = self._sample_source_views(self.config.num_source_views)
         ray_bundle.metadata.update(source_data)
 
         return ray_bundle, batch
 
     def next_eval(self, step: int) -> Tuple[RayBundle, Dict]:
-        """A mesma lógica de next_train, mas usando o eval_pixel_sampler e o eval dataloader."""
         image_batch = next(self.iter_eval_image_dataloader)
-        ray_bundle, batch = self.eval_pixel_sampler.sample(image_batch)
+        batch = self.eval_pixel_sampler.sample(image_batch)
+        ray_indices = batch["indices"]
+        ray_bundle = self.eval_ray_generator(ray_indices)
         source_data = self._sample_source_views(self.config.num_source_views)
         ray_bundle.metadata.update(source_data)
-        
         return ray_bundle, batch

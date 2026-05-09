@@ -29,7 +29,7 @@ GNT = MethodSpecification(
                 ),
             },
         },
-        viewer=ViewerConfig(num_rays_per_chunk=1 << 11),
+        viewer=ViewerConfig(num_rays_per_chunk=1 << 8),
         vis="tensorboard",
     ),
     description="Generalizable NeRF Transformer (GNT)",

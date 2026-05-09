@@ -151,8 +151,23 @@ class GNTPipeline(VanillaPipeline):
         camera = cameras_to_gnt_format(
             dataset.cameras, target_idx, device=device
         ).unsqueeze(0)  # (1, 34)
+        r_min_raw = (
+            ray_bundle.nears.min()
+            if ray_bundle.nears is not None
+            else torch.tensor(0.0, device=device)
+        )
+        r_max_raw = (
+            ray_bundle.fars.max()
+            if ray_bundle.fars is not None
+            else torch.tensor(1.0, device=device)
+        )
+
+        # makes sure r_min is positive and r_max is at least 0.1 greater than r_min to avoid degenerate depth ranges
+        r_min = torch.clamp(r_min_raw, min=1e-3)
+        r_max = torch.clamp(r_max_raw, min=r_min.item() + 0.1)
+
         depth_range = (
-            torch.stack([ray_bundle.nears.min(), ray_bundle.fars.max()], dim=0)
+            torch.stack([r_min, r_max], dim=0)
             .to(device=device, dtype=torch.float32)
             .unsqueeze(0)
         )  # (1, 2)
