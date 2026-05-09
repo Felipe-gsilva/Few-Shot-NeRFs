@@ -10,4 +10,4 @@ a NeRFStudio unnoficial implementation for:
 
 this repo (each impl) will later be added into PyPi for those who want to import and use it alongside you default nerfstudio env
 
-> [!info] if there is sometime left, I'd like to implement tinycudann for faster results.
+- [ ] integrate tinycudann already implemented nets
