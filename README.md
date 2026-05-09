@@ -4,7 +4,6 @@ this is a repo for implementation real world NeRF architectures into NeRFStudio.
 
 a NeRFStudio unnoficial implementation for: 
 - [ ] VolRecon
-- [ ] Zero-1-to-3
 
 this repo (each impl) will later be added into PyPi for those who want to import and use it alongside you default nerfstudio env
 
