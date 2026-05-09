@@ -77,13 +77,12 @@ class PixelNeRFModelConfig(ModelConfig):
         default_factory=lambda: {
             "rgb": {"use_l1": False},
             "rgb_fine": {"use_l1": False},
-            "alpha": {
-                "lambda_alpha": 0.0, "clamp_alpha": 100, "init_epoch": 5
-            },
+            "alpha": {"lambda_alpha": 0.0, "clamp_alpha": 100, "init_epoch": 5},
         },
         metadata={
             "help": "Configuration for the pixelNeRF loss. Currently using the paper default configuration "
-        })
+        },
+    )
     lindisp: bool = False
     """Whether to sample linearly in disparity (inverse depth) rather than depth. Paper defines it troughout dataset preprocessing, so we keep it as a config option but set it to False by default since it's not commonly used in nerf implementations."""
 
@@ -198,8 +197,9 @@ class PixelNeRFModel(Model):
             metadata["src_rgbs"].squeeze(0).permute(0, 3, 1, 2).to(device)
         )  # (NS, 3, H, W)
         src_poses = metadata["src_cameras"].squeeze(0).to(device)  # (NS, 4, 4)
-        focal = metadata["focal"].to(device)  # (NS, 2)
-        c = metadata["c"].to(device)  # (NS, 2)
+
+        focal = ray_bundle.metadata["focal"][0].unsqueeze(0).to(device)
+        c = ray_bundle.metadata["c"][0].unsqueeze(0).to(device)
 
         self.net.encode(
             src_images.unsqueeze(0),
@@ -208,9 +208,15 @@ class PixelNeRFModel(Model):
             c=c,
         )
 
+        if ray_bundle.nears is None:
+            ray_bundle.nears = torch.zeros_like(ray_bundle.origins[..., :1])
+        if ray_bundle.fars is None:
+            ray_bundle.fars = torch.ones_like(ray_bundle.origins[..., :1])
+
         rays = torch.cat(
             [
                 ray_bundle.origins.to(device),
+                ray_bundle.directions.to(device),
                 ray_bundle.directions.to(device),
                 ray_bundle.nears.to(device),
                 ray_bundle.fars.to(device),
