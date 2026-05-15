@@ -2512,7 +2512,7 @@ wheels = [
 
 [[package]]
 name = "nerfstudio-gnt"
-version = "0.0.9"
+version = "0.0.14"
 source = { editable = "." }
 dependencies = [
     { name = "lpips" },

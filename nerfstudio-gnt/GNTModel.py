@@ -118,6 +118,10 @@ class GNTModel(Model):
             ret_alpha=self.config.N_importance > 0,
         )
 
+        torch.quantization.quantize_dynamic(
+            self.net_coarse, {torch.nn.Linear}, dtype=torch.qint8, inplace=True
+        )
+
         self.net_fine = (
             None
             if self.config.single_net
@@ -130,10 +134,20 @@ class GNTModel(Model):
             )
         )
 
+        if self.net_fine is not None:
+            # quantize the fine GNT for faster foward pass during coarse sampling
+            torch.quantization.quantize_dynamic(
+                self.net_fine, {torch.nn.Linear}, dtype=torch.qint8, inplace=True
+            )
+
         self.feature_net = ResUNet(
             coarse_out_ch=self.config.coarse_feat_dim,
             fine_out_ch=self.config.fine_feat_dim,
             single_net=self.config.single_net,
+        )
+
+        torch.quantization.quantize_dynamic(
+            self.feature_net, {torch.nn.Linear}, dtype=torch.qint8, inplace=True
         )
 
         # Use a dummy device for projector at init time;
