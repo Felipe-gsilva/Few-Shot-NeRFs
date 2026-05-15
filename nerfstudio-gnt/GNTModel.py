@@ -255,7 +255,7 @@ class GNTModel(Model):
         self, outputs, batch, metrics_dict=None
     ) -> Dict[str, torch.Tensor]:
         loss = torch.nn.functional.mse_loss(
-            outputs["outputs_coarse"]["rgb"], batch["rgb"] if batch["rgb"] else batch["image"]
+            outputs["outputs_coarse"]["rgb"], batch.get("rgb", batch.get("image"))
         )
         return {"rgb_loss": loss}
 
