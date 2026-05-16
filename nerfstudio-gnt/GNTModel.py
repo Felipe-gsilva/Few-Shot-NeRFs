@@ -23,12 +23,20 @@ from GNT.gnt.render_ray import render_rays
 def de_parallel(model):
     return model.module if hasattr(model, "module") else model
 
+def download_pretrained_gnt_model():
+    import gdown
+    url = "https://drive.google.com/file/d/1YvOJXa5eGpKgoMYcxC2ma7prB1n5UwRn/"  # Replace with actual URL
+    output = "gnt_pretrained_model.ckpt"
+    gdown.download(url, output, quiet=False)
+    print(f"Pretrained GNT model downloaded to {output}")
+
 
 @dataclass
 class GNTModelConfig(ModelConfig):
     """Config for the GNTModel. This is where you can set hyperparameters for your model, such as the number of layers, hidden dimensions, etc."""
-
     _target: Type = field(default_factory=lambda: GNTModel, init=False)
+    transfer_learning: bool = False
+    """Whether to use transfer learning from a pretrained model. If True, the model will load from the checkpoint specified in ckpt_path and will not train the feature net."""
     coarse_feat_dim: int = 48
     """The number of feature channels for the coarse MLP."""
     fine_feat_dim: int = 48

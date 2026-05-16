@@ -2512,15 +2512,17 @@ wheels = [
 
 [[package]]
 name = "nerfstudio-gnt"
-version = "0.0.9"
+version = "0.0.19"
 source = { editable = "." }
 dependencies = [
+    { name = "gdown" },
     { name = "lpips" },
     { name = "nerfstudio" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "gdown", specifier = ">=6.0.0" },
     { name = "lpips", specifier = ">=0.1.4" },
     { name = "nerfstudio" },
 ]
