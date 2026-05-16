@@ -204,8 +204,6 @@ class GNTModel(Model):
 
         if not self.config.transfer_learning:
             param_groups["feature_net"] = list(self.feature_net.parameters())
-        else:
-            param_groups["feature_net"] = []
 
         return param_groups
 
