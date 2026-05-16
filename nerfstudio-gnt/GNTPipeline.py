@@ -183,6 +183,9 @@ class GNTPipeline(VanillaPipeline):
             batch["rgb"] = batch["image"].to(device=device, dtype=torch.float32)
         elif "rgb" in batch:
             batch["rgb"] = batch["rgb"].to(device=device, dtype=torch.float32)
+        else:
+            raise KeyError("Batch must contain either 'image' or 'rgb' key for target RGB values.")
+
         return batch
 
     @profiler.time_function
