@@ -184,7 +184,9 @@ class GNTPipeline(VanillaPipeline):
         elif "rgb" in batch:
             batch["rgb"] = batch["rgb"].to(device=device, dtype=torch.float32)
         else:
-            raise KeyError("Batch must contain either 'image' or 'rgb' key for target RGB values.")
+            raise KeyError(
+                "Batch must contain either 'image' or 'rgb' key for target RGB values."
+            )
 
         return batch
 

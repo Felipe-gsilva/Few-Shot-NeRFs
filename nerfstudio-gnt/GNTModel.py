@@ -3,10 +3,11 @@ This is a GNTModel implementation for NeRFStudio. You can see I moslty copied th
 """
 
 import os
-from types import SimpleNamespace
-from nerfstudio.data.scene_box import SceneBox
+import re
 import torch
 
+from types import SimpleNamespace
+from nerfstudio.data.scene_box import SceneBox
 from dataclasses import dataclass, field
 from nerfstudio.cameras.cameras import Cameras
 from torch.nn import Parameter
@@ -20,21 +21,21 @@ from GNT.gnt.transformer_network import GNT
 from GNT.gnt.render_ray import render_rays
 
 
-def de_parallel(model):
-    return model.module if hasattr(model, "module") else model
+def download_pretrained_gnt_model(path):
+    from gdown import download
 
-def download_pretrained_gnt_model():
-    import gdown
     url = "https://drive.google.com/file/d/1YvOJXa5eGpKgoMYcxC2ma7prB1n5UwRn/"  # Replace with actual URL
-    output = "gnt_pretrained_model.ckpt"
-    gdown.download(url, output, quiet=False)
+    output = path
+    download(url, output, quiet=False)
     print(f"Pretrained GNT model downloaded to {output}")
 
 
 @dataclass
 class GNTModelConfig(ModelConfig):
     """Config for the GNTModel. This is where you can set hyperparameters for your model, such as the number of layers, hidden dimensions, etc."""
+
     _target: Type = field(default_factory=lambda: GNTModel, init=False)
+    """The target class for this config. This is used by NeRFStudio to instantiate the model when you specify this config in your pipeline config."""
     transfer_learning: bool = False
     """Whether to use transfer learning from a pretrained model. If True, the model will load from the checkpoint specified in ckpt_path and will not train the feature net."""
     coarse_feat_dim: int = 48
@@ -63,16 +64,10 @@ class GNTModelConfig(ModelConfig):
     """The width of the MLPs for both the coarse and fine networks."""
     transdepth: int = 4
     """The number of layers in the MLPs for both the coarse and fine networks."""
-    lrate_feature: float = 1e-3
-    """The learning rate for the feature MLP."""
-    lrate_gnt: float = 1e-3
-    """The learning rate for the coarse and fine MLPs."""
     ckpt_path: Optional[str] = None
     """The path to a checkpoint to load the model from. If None, the model will be initialized from scratch."""
-    lrate_decay_steps: int = 500
-    """The number of steps between learning rate decay."""
-    lrate_decay_factor: float = 0.5
-    """The factor by which to decay the learning rate."""
+    pretrained_ckpt_path: Optional[str] = None
+    """The path to a pretrained checkpoint for transfer learning. If None and transfer_learning is True, the model will attempt to download a pretrained checkpoint from a hardcoded URL."""
     no_reload: bool = False
     """If True, will not load from existing checkpoints even if they exist."""
 
@@ -106,9 +101,48 @@ class GNTModel(Model):
             scene_box = SceneBox(
                 aabb=torch.tensor([[-1, -1, -1], [1, 1, 1]], dtype=torch.float32)
             )
+
         super().__init__(
             config=config, scene_box=scene_box, num_train_data=num_train_data, **kwargs
         )
+
+        if self.config.transfer_learning:
+            ckpt = self.config.pretrained_ckpt_path or "gnt_pretrained_model.ckpt"
+            if not os.path.exists(ckpt):
+                download_pretrained_gnt_model(ckpt)
+            self.config.pretrained_ckpt_path = ckpt
+
+    def _load_pretrained(self, ckpt_path):
+        assert os.path.isfile(ckpt_path), (
+            f"Checkpoint path {ckpt_path} does not exist or is not a file."
+        )
+
+        print(f"Loading pretrained weights for Transfer Learning from: {ckpt_path}")
+
+        weights = torch.load(ckpt_path, map_location="cpu")
+
+        def load_weights_safely(module, weight_entry):
+            if isinstance(weight_entry, torch.nn.Module):
+                module.load_state_dict(weight_entry.state_dict())
+            else:
+                module.load_state_dict(weight_entry)
+
+        if "feature_net" in weights:
+            load_weights_safely(self.feature_net, weights["feature_net"])
+        if "net_coarse" in weights:
+            load_weights_safely(self.net_coarse, weights["net_coarse"])
+        if "net_fine" in weights and self.net_fine is not None:
+            load_weights_safely(self.net_fine, weights["net_fine"])
+
+        # freeze feat network
+        self._freeze_feature_net()
+
+    def _freeze_feature_net(self):
+        print("Transfer Learning Active: Freezing Feature Network.")
+        for param in self.feature_net.parameters():
+            param.requires_grad = False
+
+        self.feature_net.eval()
 
     def populate_modules(self):
         super().populate_modules()
@@ -144,23 +178,44 @@ class GNTModel(Model):
             single_net=self.config.single_net,
         )
 
-        # Use a dummy device for projector at init time;
-        # update it in get_outputs where self.device is available
         self.projector = Projector(
             device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
         )
 
+        if self.config.transfer_learning and self.config.ckpt_path is not None:
+            self._load_pretrained(self.config.ckpt_path)
+
+        # resume checkpoint
         out_folder = os.path.join(self.config.out_dir, self.config.exp_name, "ckpts")
         self.start_step = self.load_from_ckpt(out_folder)
 
+        # re-freeze (load_from_ckpt resets requires_grad)
+        if self.config.transfer_learning:
+            self._freeze_feature_net()
+
     def get_param_groups(self) -> Dict[str, List[Parameter]]:
-        """Returns the parameter groups needed to optimizer your model components."""
-        param_groups = {
-            "network": list(self.net_coarse.parameters())
-            + (list(self.net_fine.parameters()) if self.net_fine else []),
-            "feature_net": list(self.feature_net.parameters()),
-        }
+        """Returns the parameter groups passed downstream to NeRFStudio's optimizers."""
+        param_groups = {}
+
+        # Transformer/rendering networks always train
+        param_groups["network"] = list(self.net_coarse.parameters())
+        if self.net_fine is not None:
+            param_groups["network"] += list(self.net_fine.parameters())
+
+        if not self.config.transfer_learning:
+            param_groups["feature_net"] = list(self.feature_net.parameters())
+        else:
+            param_groups["feature_net"] = []
+
         return param_groups
+
+    def train(self, mode: bool = True):
+        """Override the standard PyTorch train mode toggle to keep feature_net frozen."""
+        super().train(mode)
+        if self.config.transfer_learning:
+            self.feature_net.eval()
+
+        return self
 
     def get_training_callbacks(
         self, training_callback_attributes: TrainingCallbackAttributes
@@ -246,35 +301,61 @@ class GNTModel(Model):
 
     def get_metrics_dict(self, outputs, batch) -> Dict[str, torch.Tensor]:
         metrics_dict = {}
-        if "outputs_fine" in outputs and outputs["outputs_fine"] is not None:
-            predicted_rgb = outputs["outputs_fine"]["rgb"]
-        else:
-            predicted_rgb = outputs["outputs_coarse"]["rgb"]
-
-        gt_rgb = batch["rgb"].to(predicted_rgb.device)
-        mse = torch.nn.functional.mse_loss(predicted_rgb, gt_rgb)
-        psnr = -10.0 * torch.log10(mse.clamp_min(1e-10))
-
-        metrics_dict["psnr"] = psnr
-
-        return metrics_dict
-
-    def get_loss_dict(
-        self, outputs, batch, metrics_dict=None
-    ) -> Dict[str, torch.Tensor]:
-        loss = torch.nn.functional.mse_loss(
-            outputs["outputs_coarse"]["rgb"], batch.get("rgb", batch.get("image"))
-        )
-        return {"rgb_loss": loss}
-
-    def get_image_metrics_and_images(self, outputs, batch):
         pred_key = (
             "outputs_fine"
             if "outputs_fine" in outputs and outputs["outputs_fine"] is not None
             else "outputs_coarse"
         )
+
+        predicted_rgb = outputs[pred_key]["rgb"]
+        batch_rgb = batch.get("rgb", batch.get("image"))
+        if batch_rgb is None:
+            raise KeyError(
+                "Batch must contain either 'rgb' or 'image' key for ground truth RGB values."
+            )
+
+        gt_rgb = batch_rgb.to(predicted_rgb.device)
+
+        # I could use MSELoss or L1Loss from nerfstudio, but since I only need MSE for PSNR calculation, I'll just compute it directly here to avoid unnecessary overhead.
+        # future test can be done
+        mse = torch.nn.functional.mse_loss(predicted_rgb, gt_rgb)
+        psnr = -10.0 * torch.log10(mse.clamp_min(1e-10))
+        metrics_dict["psnr"] = psnr
+        return metrics_dict
+
+    def get_loss_dict(
+        self, outputs, batch, metrics_dict=None
+    ) -> Dict[str, torch.Tensor]:
+        pred_key = (
+            "outputs_fine"
+            if "outputs_fine" in outputs and outputs["outputs_fine"] is not None
+            else "outputs_coarse"
+        )
+
+        loss = torch.nn.functional.mse_loss(
+            outputs[pred_key]["rgb"], batch.get("rgb", batch.get("image"))
+        )
+        return {"rgb_loss": loss}
+
+    def get_image_metrics_and_images(self, outputs, batch):
+        assert "rgb" in outputs, (
+            "render_rays must return 'rgb' in outputs for metric calculation."
+        )
+
+        pred_key = (
+            "outputs_fine"
+            if "outputs_fine" in outputs and outputs["outputs_fine"] is not None
+            else "outputs_coarse"
+        )
+
         predicted_rgb = outputs[pred_key]["rgb"]  # (N, 3)
-        gt_rgb = batch["rgb"].to(predicted_rgb.device)  # (N, 3)
+        batch_rgb = batch.get("rgb", batch.get("image"))
+        if batch_rgb is None:
+            raise KeyError(
+                "Batch must contain either 'rgb' or 'image' key for ground truth RGB values."
+            )
+
+        gt_rgb = batch_rgb.to(predicted_rgb.device)  # (N, 3)
 
         mse = torch.mean((predicted_rgb - gt_rgb) ** 2).clamp_min(1e-10)
         psnr = -10.0 * torch.log10(mse)
@@ -289,19 +370,20 @@ class GNTModel(Model):
 
     def switch_to_train(self):
         self.net_coarse.train()
-        self.feature_net.train()
         if self.net_fine is not None:
             self.net_fine.train()
+        if self.config.transfer_learning:
+            self.feature_net.eval()
+        else:
+            self.feature_net.train()
 
     def save_model(self, filename):
         to_save = {
-            "net_coarse": de_parallel(self.net_coarse).state_dict(),
-            "feature_net": de_parallel(self.feature_net).state_dict(),
+            "net_coarse": self.net_coarse.state_dict(),
+            "feature_net": self.feature_net.state_dict(),
         }
         if self.net_fine is not None:
-            to_save["net_fine"] = de_parallel(self.net_fine).state_dict()
-        torch.save(to_save, filename)
-
+            to_save["net_fine"] = self.net_fine.state_dict()
         torch.save(to_save, filename)
 
     def load_model(self, filename):
@@ -311,16 +393,13 @@ class GNTModel(Model):
         if self.net_fine is not None and "net_fine" in to_load:
             self.net_fine.load_state_dict(to_load["net_fine"])
 
-    def load_from_ckpt(
-        self, out_folder, load_opt=True, load_scheduler=True, force_latest_ckpt=False
-    ):
+    def load_from_ckpt(self, out_folder, force_latest_ckpt=False):
         """
         load model from existing checkpoints and return the current step
         :param out_folder: the directory that stores ckpts
         :return: the current starting step
         """
 
-        # all existing ckpts
         ckpts = []
         if os.path.exists(out_folder):
             ckpts = [
@@ -330,16 +409,16 @@ class GNTModel(Model):
             ]
 
         if self.config.ckpt_path is not None and not force_latest_ckpt:
-            if os.path.isfile(self.config.ckpt_path):  # load the specified ckpt
+            if os.path.isfile(self.config.ckpt_path):
                 ckpts = [self.config.ckpt_path]
 
-        if len(ckpts) > 0 and not self.config.no_reload:
+        if ckpts and not self.config.no_reload:
             fpath = ckpts[-1]
             self.load_model(fpath)
-            step = int(fpath[-10:-4])
-            print("Reloading from {}, starting at step={}".format(fpath, step))
-        else:
-            print("No ckpts found, training from scratch...")
-            step = 0
+            m = re.search(r"(\d+)\.pth$", fpath)
+            step = int(m.group(1)) if m else 0
+            print(f"Reloading from {fpath}, starting at step={step}")
+            return step
 
-        return step
+        print("No ckpts found, training from scratch...")
+        return 0

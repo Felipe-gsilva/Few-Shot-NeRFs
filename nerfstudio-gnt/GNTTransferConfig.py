@@ -13,18 +13,11 @@ GNT_TRANSFER = MethodSpecification(
         pipeline=GNTPipelineConfig(
             model=GNTModelConfig(
                 transfer_learning=True,
-                ckpt_path="/home/ubuntu/nerfstudio-gnt/pretrained_models/gnt_synthetic_nerf.ckpt",
+                pretrained_ckpt_path="gnt_synthetic_nerf.ckpt",
             ),
         ),
         optimizers={
             "network": {
-                "optimizer": AdamOptimizerConfig(lr=1e-3),
-                "scheduler": ExponentialDecaySchedulerConfig(
-                    lr_final=1e-4,
-                    max_steps=100000,
-                ),
-            },
-            "feature_net": {
                 "optimizer": AdamOptimizerConfig(lr=1e-3),
                 "scheduler": ExponentialDecaySchedulerConfig(
                     lr_final=1e-4,
