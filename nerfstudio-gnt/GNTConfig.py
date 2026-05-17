@@ -3,7 +3,6 @@ from nerfstudio.engine.optimizers import AdamOptimizerConfig
 from nerfstudio.engine.schedulers import ExponentialDecaySchedulerConfig
 from nerfstudio.engine.trainer import TrainerConfig
 from nerfstudio.plugins.types import MethodSpecification
-
 from GNTPipeline import GNTPipelineConfig
 from GNTModel import GNTModelConfig
 
