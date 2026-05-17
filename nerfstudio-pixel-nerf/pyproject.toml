@@ -4,12 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nerfstudio-pixelnerf"
-version = "0.0.9"
+version = "0.0.10"
 description = "Unofficial Implementation of `pixelNeRF: Neural Radiance Fields from One or Few Images` [Yu et al.] for NeRFStudio"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
   "dotmap>=1.3.30",
+  "gdown>=6.0.0",
   "lpips>=0.1.4",
   "nerfstudio",
   "pyhocon>=0.3.63",

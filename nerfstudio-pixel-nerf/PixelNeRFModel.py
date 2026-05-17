@@ -25,11 +25,37 @@ import torch
 import nerfstudio.utils.profiler as profiler
 
 
+def download_pretrained_pixelnerf_weights():
+    import gdown
+
+    url = "https://drive.google.com/file/d/1UO_rL201guN6euoWkCOn-XpqR2e8o6ju"
+    output = "pixelnerf_pretrained.pth"
+    if not os.path.exists(output):
+        print("Downloading pretrained PixelNeRF weights...")
+        gdown.download(url, output, quiet=False)
+
+    else:
+        print("Pretrained PixelNeRF weights already downloaded.")
+
+    unzipped_path = "pixelnerf_pretrained"
+    if not os.path.exists(unzipped_path):
+        print("Unzipping pretrained weights...")
+        import zipfile
+
+        with zipfile.ZipFile(output, "r") as zip_ref:
+            zip_ref.extractall(unzipped_path)
+        print(f"Pretrained weights downloaded and unzipped to {unzipped_path}")
+
+
 @dataclass
 class PixelNeRFModelConfig(ModelConfig):
     _target: Type = field(default_factory=lambda: PixelNeRFModel, init=False)
     ckpt_path: Optional[str] = None
     """Path to a .pth checkpoint file to load the network weights from. If not provided, will look for .pth files in the output directory and load the latest one."""
+    pretrained_ckpt_path: Optional[str] = None
+    """Path to a .pth checkpoint file containing pretrained weights to initialize the network with. This is different from ckpt_path in that it will only be used to initialize the network weights and will not be reloaded during training. If not provided, will use the official pretrained weights from the paper (https://drive.google.com/file/d/1UO_rL201guN6euoWkCOn-XpqR2e8o6ju)"""
+    transfer_learning: bool = False
+    """Whether to use the pretrained weights for transfer learning."""
     no_reload: bool = False
     """If True, will not attempt to load from any checkpoint and will always train from scratch."""
     out_dir: str = "outputs"
@@ -52,6 +78,9 @@ class PixelNeRFModelConfig(ModelConfig):
             "n_blocks": 3,
             "d_hidden": 512,
         },
+        metadata={
+            "help": "Configuration for the pixelNeRF coarse MLP. Currently using the paper default configuration"
+        },
     )
 
     mlp_fine: Dict[str, Any] = field(
@@ -59,6 +88,9 @@ class PixelNeRFModelConfig(ModelConfig):
             "type": "resnet",
             "n_blocks": 4,
             "d_hidden": 512,
+        },
+        metadata={
+            "help": "Configuration for the pixelNeRF fine MLP. Currently using the paper default configuration, which is the same as the coarse MLP but with one additional block."
         },
     )
     renderer: Dict[str, Any] = field(
@@ -118,13 +150,32 @@ class PixelNeRFModel(Model):
                 self.net, gpus=list(range(torch.cuda.device_count()))
             ).eval()
 
-        if self.config.no_reload:  # type: ignore
+        if self.config.no_reload:
             print("Not loading from ckpt, training from scratch...")
         else:
-            self.load_from_ckpt(self.config.out_dir, force_latest=False)  # type: ignore
+            if self.config.transfer_learning:
+                self.load_from_ckpt(self.config.pretrained_ckpt_path, force_latest=True)
+                print("Using pretrained weights for transfer learning...")
+                self.freeze_net()
+            else:
+                print("Loading from ckpt if available...")
+                self.load_from_ckpt(self.config.out_dir)
+
+    def freeze_net(self):
+        for param in self.net.encoder.parameters():
+            param.requires_grad = False
 
     def get_param_groups(self) -> Dict[str, List[Parameter]]:
-        return {"network": list(self.net.parameters())}
+        return_map = {}
+        return_map["encoder"] = (
+            list(self.net.encoder.parameters())
+            if self.net.encoder.requires_grad == True
+            else []
+        )
+        return_map["nerf"] = list(self.net.mlp_coarse.parameters()) + list(
+            self.net.mlp_fine.parameters() if self.net.mlp_fine is not None else []
+        )
+        return return_map
 
     def get_training_callbacks(
         self, training_callback_attributes: TrainingCallbackAttributes
@@ -177,7 +228,7 @@ class PixelNeRFModel(Model):
             print(f"Reloading from {fpath}")
             return int(fpath[-10:-4])
         print("No ckpts found, training from scratch...")
-        return 0
+        return
 
     @profiler.time_function
     def get_outputs(

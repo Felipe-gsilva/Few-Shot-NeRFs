@@ -22,7 +22,14 @@ PixelNeRF = MethodSpecification(
             model=PixelNeRFModelConfig(),
         ),
         optimizers={
-            "network": {
+            "encoder": {
+                "optimizer": AdamOptimizerConfig(lr=1e-3, eps=1e-15),
+                "scheduler": ExponentialDecaySchedulerConfig(
+                    lr_final=5e-5,
+                    max_steps=300000,
+                ),
+            },
+            "nerf": {
                 "optimizer": AdamOptimizerConfig(lr=1e-3, eps=1e-15),
                 "scheduler": ExponentialDecaySchedulerConfig(
                     lr_final=5e-5,
