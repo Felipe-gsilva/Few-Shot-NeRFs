@@ -169,7 +169,7 @@ class PixelNeRFModel(Model):
         return_map = {}
         return_map["encoder"] = (
             list(self.net.encoder.parameters())
-            if self.net.encoder.requires_grad == True
+            if self.net.encoder.requires_grad_ == True
             else []
         )
         return_map["nerf"] = list(self.net.mlp_coarse.parameters()) + list(
