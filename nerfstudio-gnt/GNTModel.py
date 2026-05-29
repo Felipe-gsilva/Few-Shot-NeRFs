@@ -146,6 +146,7 @@ class GNTModel(Model):
 
     def populate_modules(self):
         super().populate_modules()
+        self.dummy_param = Parameter(torch.tensor([0.0]))
 
         args = SimpleNamespace(
             netwidth=self.config.netwidth,
@@ -182,14 +183,12 @@ class GNTModel(Model):
             device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
         )
 
-        if self.config.transfer_learning and self.config.ckpt_path is not None:
-            self._load_pretrained(self.config.ckpt_path)
+        if self.config.transfer_learning and self.config.pretrained_ckpt_path is not None:
+            self._load_pretrained(self.config.pretrained_ckpt_path)
 
-        # resume checkpoint
         out_folder = os.path.join(self.config.out_dir, self.config.exp_name, "ckpts")
         self.start_step = self.load_from_ckpt(out_folder)
 
-        # re-freeze (load_from_ckpt resets requires_grad)
         if self.config.transfer_learning:
             self._freeze_feature_net()
 
@@ -197,13 +196,14 @@ class GNTModel(Model):
         """Returns the parameter groups passed downstream to NeRFStudio's optimizers."""
         param_groups = {}
 
-        # Transformer/rendering networks always train
         param_groups["network"] = list(self.net_coarse.parameters())
         if self.net_fine is not None:
             param_groups["network"] += list(self.net_fine.parameters())
 
         if not self.config.transfer_learning:
             param_groups["feature_net"] = list(self.feature_net.parameters())
+        else:
+            param_groups["feature_net"] = [self.dummy_param]
 
         return param_groups
 
@@ -220,6 +220,44 @@ class GNTModel(Model):
     ) -> List[TrainingCallback]:
         """Returns the training callbacks, such as updating a density grid for Instant NGP."""
         return []
+
+    @torch.no_grad()
+    def get_outputs_for_camera_ray_bundle(self, camera_ray_bundle: RayBundle) -> Dict[str, torch.Tensor]:
+        image_metadata = {}
+        if camera_ray_bundle.metadata is not None:
+            image_metadata = {k: v for k, v in camera_ray_bundle.metadata.items() if k in ["src_rgbs", "src_cameras", "camera", "depth_range"]}
+            for k in image_metadata.keys():
+                camera_ray_bundle.metadata.pop(k)
+
+        num_rays_per_chunk = self.config.eval_num_rays_per_chunk
+        image_height, image_width = camera_ray_bundle.origins.shape[:2]
+        num_rays = len(camera_ray_bundle)
+        outputs_lists = defaultdict(list)
+        
+        for i in range(0, num_rays, num_rays_per_chunk):
+            start_idx = i
+            end_idx = i + num_rays_per_chunk
+            ray_bundle = camera_ray_bundle.get_row_major_sliced_ray_bundle(start_idx, end_idx)
+            
+            if ray_bundle.metadata is None:
+                ray_bundle.metadata = {}
+            ray_bundle.metadata.update(image_metadata)
+            
+            outputs = self.forward(ray_bundle=ray_bundle)
+            for output_name, output in outputs.items():
+                if not torch.is_tensor(output):
+                    continue
+                outputs_lists[output_name].append(output)
+                
+        outputs = {}
+        for output_name, outputs_list in outputs_lists.items():
+            outputs[output_name] = torch.cat(outputs_list).view(image_height, image_width, -1)
+            
+        if camera_ray_bundle.metadata is None:
+            camera_ray_bundle.metadata = {}
+        camera_ray_bundle.metadata.update(image_metadata)
+        
+        return outputs
 
     def get_outputs(
         self, ray_bundle: RayBundle | Cameras

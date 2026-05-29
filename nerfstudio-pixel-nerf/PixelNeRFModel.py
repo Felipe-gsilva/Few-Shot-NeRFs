@@ -167,14 +167,20 @@ class PixelNeRFModel(Model):
 
     def get_param_groups(self) -> Dict[str, List[Parameter]]:
         return_map = {}
-        return_map["encoder"] = (
-            list(self.net.encoder.parameters())
-            if self.net.encoder.requires_grad_ == True
-            else []
-        )
-        return_map["nerf"] = list(self.net.mlp_coarse.parameters()) + list(
-            self.net.mlp_fine.parameters() if self.net.mlp_fine is not None else []
-        )
+        
+        encoder_params = [p for p in self.net.encoder.parameters() if p.requires_grad]
+        
+        if len(encoder_params) > 0:
+            return_map["encoder"] = encoder_params
+
+        nerf_params = list(self.net.mlp_coarse.parameters())
+        if self.net.mlp_fine is not None:
+            nerf_params += list(self.net.mlp_fine.parameters())
+            
+        nerf_trainable = [p for p in nerf_params if p.requires_grad]
+        if len(nerf_trainable) > 0:
+            return_map["nerf"] = nerf_trainable
+            
         return return_map
 
     def get_training_callbacks(
@@ -209,26 +215,80 @@ class PixelNeRFModel(Model):
         return {"psnr": float(psnr.item())}, {"rgb": pred, "rgb_gt": gt}
 
     def load_from_ckpt(self, out_folder, force_latest=False):
-        if not os.path.exists(out_folder):
-            print("No ckpts found, training from scratch...")
+        if out_folder is None:
+            print("No ckpt path provided, starting from scratch...")
             return 0
-        ckpts = sorted(
-            [
-                os.path.join(out_folder, f)
-                for f in os.listdir(out_folder)
-                if f.endswith(".pth")
-            ]
-        )
+            
+        if not os.path.exists(out_folder):
+            print(f"Path {out_folder} does not exist, starting from scratch...")
+            return 0
+            
+        if os.path.isfile(out_folder):
+            ckpts = [out_folder]
+        else:
+            ckpts = sorted(
+                [
+                    os.path.join(out_folder, f)
+                    for f in os.listdir(out_folder)
+                    if f.endswith(".pth")
+                ]
+            )
+            
         if self.config.ckpt_path and not force_latest:
             if os.path.isfile(self.config.ckpt_path):
                 ckpts = [self.config.ckpt_path]
+                
         if ckpts and not self.config.no_reload:
             fpath = ckpts[-1]
             self.net.load_state_dict(torch.load(fpath, map_location="cpu"))
-            print(f"Reloading from {fpath}")
-            return int(fpath[-10:-4])
-        print("No ckpts found, training from scratch...")
-        return
+            print(f"✅ Reloading from {fpath}")
+            
+            # Previne erro se o nome do arquivo pretrained não tiver 6 digitos numéricos no final
+            try:
+                return int(fpath[-10:-4])
+            except ValueError:
+                return 0
+                
+        print("No valid ckpts found, training from scratch...")
+        return 0
+
+    @torch.no_grad()
+    def get_outputs_for_camera_ray_bundle(self, camera_ray_bundle: RayBundle) -> Dict[str, torch.Tensor]:
+        image_metadata = {}
+        if camera_ray_bundle.metadata is not None:
+            image_metadata = {k: v for k, v in camera_ray_bundle.metadata.items() if k in ["src_rgbs", "src_cameras", "focal", "c"]}
+            for k in image_metadata.keys():
+                camera_ray_bundle.metadata.pop(k)
+
+        num_rays_per_chunk = self.config.eval_num_rays_per_chunk
+        image_height, image_width = camera_ray_bundle.origins.shape[:2]
+        num_rays = len(camera_ray_bundle)
+        outputs_lists = defaultdict(list)
+        
+        for i in range(0, num_rays, num_rays_per_chunk):
+            start_idx = i
+            end_idx = i + num_rays_per_chunk
+            ray_bundle = camera_ray_bundle.get_row_major_sliced_ray_bundle(start_idx, end_idx)
+            
+            if ray_bundle.metadata is None:
+                ray_bundle.metadata = {}
+            ray_bundle.metadata.update(image_metadata)
+            
+            outputs = self.forward(ray_bundle=ray_bundle)
+            for output_name, output in outputs.items():
+                if not torch.is_tensor(output):
+                    continue
+                outputs_lists[output_name].append(output)
+                
+        outputs = {}
+        for output_name, outputs_list in outputs_lists.items():
+            outputs[output_name] = torch.cat(outputs_list).view(image_height, image_width, -1)
+            
+        if camera_ray_bundle.metadata is None:
+            camera_ray_bundle.metadata = {}
+        camera_ray_bundle.metadata.update(image_metadata)
+        
+        return outputs
 
     @profiler.time_function
     def get_outputs(
