@@ -21,6 +21,7 @@ from pyhocon import ConfigFactory
 from dotmap import DotMap
 
 import os
+from collections import defaultdict
 import torch
 import nerfstudio.utils.profiler as profiler
 
@@ -192,17 +193,17 @@ class PixelNeRFModel(Model):
         self, outputs, batch, metrics_dict=None
     ) -> Dict[str, torch.Tensor]:
         """The paper calcs loss"""
-        loss = torch.nn.functional.mse_loss(outputs["rgb_coarse"], batch["rgb"])
+        loss = torch.nn.functional.mse_loss(outputs["rgb_coarse"], batch["image"])
         if "rgb_fine" in outputs:
             loss = loss + torch.nn.functional.mse_loss(
-                outputs["rgb_fine"], batch["rgb"]
+                outputs["rgb_fine"], batch["image"]
             )
         return {"rgb_loss": loss}
 
     def get_metrics(self, outputs, batch) -> Dict[str, torch.Tensor]:
         """The paper only reports PSNR, but you can add more metrics here if you want."""
         pred = outputs.get("rgb_fine", outputs["rgb_coarse"])
-        gt = batch["rgb"].to(pred.device)
+        gt = batch["image"].to(pred.device)
         psnr = -10.0 * torch.log10(torch.mean((pred - gt) ** 2).clamp_min(1e-10))
         return {"psnr": psnr}
 
@@ -210,7 +211,7 @@ class PixelNeRFModel(Model):
         self, outputs, batch
     ) -> Tuple[Dict[str, float], Dict[str, torch.Tensor]]:
         pred = outputs.get("rgb_fine", outputs["rgb_coarse"])
-        gt = batch["rgb"].to(pred.device)
+        gt = batch["image"].to(pred.device)
         psnr = -10.0 * torch.log10(torch.mean((pred - gt) ** 2).clamp_min(1e-10))
         return {"psnr": float(psnr.item())}, {"rgb": pred, "rgb_gt": gt}
 

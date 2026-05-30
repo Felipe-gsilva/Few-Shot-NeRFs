@@ -11,6 +11,7 @@ from nerfstudio.data.scene_box import SceneBox
 from dataclasses import dataclass, field
 from nerfstudio.cameras.cameras import Cameras
 from torch.nn import Parameter
+from collections import defaultdict
 from typing import Dict, List, Optional, Type, cast
 from nerfstudio.models.base_model import Model, ModelConfig
 from nerfstudio.cameras.rays import RayBundle
@@ -38,11 +39,11 @@ class GNTModelConfig(ModelConfig):
     """The target class for this config. This is used by NeRFStudio to instantiate the model when you specify this config in your pipeline config."""
     transfer_learning: bool = False
     """Whether to use transfer learning from a pretrained model. If True, the model will load from the checkpoint specified in ckpt_path and will not train the feature net."""
-    coarse_feat_dim: int = 48
+    coarse_feat_dim: int = 32
     """The number of feature channels for the coarse MLP."""
-    fine_feat_dim: int = 48
+    fine_feat_dim: int = 32
     """The number of feature channels for the fine MLP."""
-    single_net: bool = False
+    single_net: bool = True
     """Whether to use a single MLP for both coarse and fine sampling. If True, only net_coarse will be used and net_fine will be set to None."""
     N_samples: int = 64
     """The number of samples to take along each ray for the coarse MLP."""
