@@ -5,6 +5,8 @@ this is a repo for implementation real world NeRF architectures into NeRFStudio.
 a NeRFStudio unnoficial implementation for: 
 - [X] GNT
 - [X] PixelNeRF
+- [ ] RegNeRF
+- [ ] MVSNeRF
 - [ ] VolRecon
 - [ ] Zero123
 
