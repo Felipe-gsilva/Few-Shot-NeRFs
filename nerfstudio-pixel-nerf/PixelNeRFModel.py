@@ -193,10 +193,11 @@ class PixelNeRFModel(Model):
         self, outputs, batch, metrics_dict=None
     ) -> Dict[str, torch.Tensor]:
         """The paper calcs loss"""
-        loss = torch.nn.functional.mse_loss(outputs["rgb_coarse"], batch["image"])
+        target = batch["image"].to(outputs["rgb_coarse"].device)
+        loss = torch.nn.functional.mse_loss(outputs["rgb_coarse"], target)
         if "rgb_fine" in outputs:
             loss = loss + torch.nn.functional.mse_loss(
-                outputs["rgb_fine"], batch["image"]
+                outputs["rgb_fine"], target
             )
         return {"rgb_loss": loss}
 
@@ -253,42 +254,117 @@ class PixelNeRFModel(Model):
         print("No valid ckpts found, training from scratch...")
         return 0
 
+    def _encode_from_metadata(self, metadata: Dict[str, Any], device: torch.device) -> None:
+        """Encode source-view conditioning once per rendered image.
+
+        The original implementation encoded inside the ray-chunk loop (via `forward/get_outputs`),
+        which re-ran the ResNet encoder thousands of times per image and made evaluation extremely slow.
+        """
+        for key in ("src_rgbs", "src_cameras", "focal", "c"):
+            if key not in metadata:
+                raise KeyError(f"Missing metadata key '{key}' — pipeline must inject source views")
+
+        src_images = metadata["src_rgbs"].squeeze(0).permute(0, 3, 1, 2).to(device)  # (NS, 3, H, W)
+        src_poses = metadata["src_cameras"].squeeze(0).to(device)  # (NS, 4, 4)
+        focal = metadata["focal"][0].unsqueeze(0).to(device)
+        c = metadata["c"][0].unsqueeze(0).to(device)
+
+        self.net.encode(
+            src_images.unsqueeze(0),
+            src_poses.unsqueeze(0),
+            focal,
+            c=c,
+        )
+
+    def _render_encoded(self, ray_bundle: RayBundle, device: torch.device) -> Dict[str, torch.Tensor]:
+        """Render rays assuming `self.net.encode(...)` has already been called."""
+        if ray_bundle.nears is None:
+            ray_bundle.nears = torch.zeros_like(ray_bundle.origins[..., :1])
+        if ray_bundle.fars is None:
+            ray_bundle.fars = torch.ones_like(ray_bundle.origins[..., :1])
+
+        rays = torch.cat(
+            [
+                ray_bundle.origins.to(device),
+                ray_bundle.directions.to(device),
+                ray_bundle.nears.to(device),
+                ray_bundle.fars.to(device),
+            ],
+            dim=-1,
+        ).unsqueeze(0)
+
+        render_dict = DotMap(self.renderer(rays, want_weights=True))
+
+        outputs: Dict[str, torch.Tensor] = {
+            "rgb_coarse": render_dict.coarse.rgb.squeeze(0),
+            "depth_coarse": render_dict.coarse.depth.squeeze(0),
+            "weights_coarse": render_dict.coarse.weights.squeeze(0),
+        }
+        if len(render_dict.fine) > 0:
+            outputs["rgb_fine"] = render_dict.fine.rgb.squeeze(0)
+            outputs["depth_fine"] = render_dict.fine.depth.squeeze(0)
+            outputs["weights_fine"] = render_dict.fine.weights.squeeze(0)
+
+        outputs["rgb"] = outputs.get("rgb_fine", outputs["rgb_coarse"])
+        outputs["accumulation"] = outputs.get(
+            "weights_fine", outputs["weights_coarse"]
+        ).sum(dim=-1)
+        outputs["depth"] = outputs.get("depth_fine", outputs["depth_coarse"])
+        return outputs
+
     @torch.no_grad()
     def get_outputs_for_camera_ray_bundle(self, camera_ray_bundle: RayBundle) -> Dict[str, torch.Tensor]:
-        image_metadata = {}
+        # Extract (and temporarily remove) the heavy conditioning metadata so ray slicing doesn't
+        # propagate large tensors into each chunk.
+        image_metadata: Dict[str, Any] = {}
         if camera_ray_bundle.metadata is not None:
-            image_metadata = {k: v for k, v in camera_ray_bundle.metadata.items() if k in ["src_rgbs", "src_cameras", "focal", "c"]}
-            for k in image_metadata.keys():
-                camera_ray_bundle.metadata.pop(k)
+            image_metadata = {
+                k: v
+                for k, v in camera_ray_bundle.metadata.items()
+                if k in ["src_rgbs", "src_cameras", "focal", "c"]
+            }
+            for k in list(image_metadata.keys()):
+                camera_ray_bundle.metadata.pop(k, None)
+
+        device = next(self.net.parameters()).device
+        if not image_metadata:
+            # Em passos de avaliação intermediários do ns-train (onde a pipeline customizada não injeta os metadados),
+            # retornamos tensores vazios/dummy para não quebrar o treinamento. As métricas reais
+            # são avaliadas ao final em main.py injetando os metadados corretamente.
+            image_height, image_width = camera_ray_bundle.origins.shape[:2]
+            return {
+                "rgb_coarse": torch.zeros((image_height, image_width, 3), device=device),
+                "depth_coarse": torch.zeros((image_height, image_width, 1), device=device),
+                "weights_coarse": torch.zeros((image_height, image_width, 1), device=device),
+                "rgb": torch.zeros((image_height, image_width, 3), device=device),
+                "depth": torch.zeros((image_height, image_width, 1), device=device),
+                "accumulation": torch.zeros((image_height, image_width, 1), device=device),
+            }
+        self._encode_from_metadata(image_metadata, device=device)
 
         num_rays_per_chunk = self.config.eval_num_rays_per_chunk
         image_height, image_width = camera_ray_bundle.origins.shape[:2]
         num_rays = len(camera_ray_bundle)
         outputs_lists = defaultdict(list)
-        
+
         for i in range(0, num_rays, num_rays_per_chunk):
             start_idx = i
             end_idx = i + num_rays_per_chunk
             ray_bundle = camera_ray_bundle.get_row_major_sliced_ray_bundle(start_idx, end_idx)
-            
-            if ray_bundle.metadata is None:
-                ray_bundle.metadata = {}
-            ray_bundle.metadata.update(image_metadata)
-            
-            outputs = self.forward(ray_bundle=ray_bundle)
+
+            outputs = self._render_encoded(ray_bundle=ray_bundle, device=device)
             for output_name, output in outputs.items():
-                if not torch.is_tensor(output):
-                    continue
                 outputs_lists[output_name].append(output)
-                
+
         outputs = {}
         for output_name, outputs_list in outputs_lists.items():
             outputs[output_name] = torch.cat(outputs_list).view(image_height, image_width, -1)
-            
+
+        # Restore metadata for any downstream consumers.
         if camera_ray_bundle.metadata is None:
             camera_ray_bundle.metadata = {}
         camera_ray_bundle.metadata.update(image_metadata)
-        
+
         return outputs
 
     @profiler.time_function
@@ -328,7 +404,6 @@ class PixelNeRFModel(Model):
         rays = torch.cat(
             [
                 ray_bundle.origins.to(device),
-                ray_bundle.directions.to(device),
                 ray_bundle.directions.to(device),
                 ray_bundle.nears.to(device),
                 ray_bundle.fars.to(device),

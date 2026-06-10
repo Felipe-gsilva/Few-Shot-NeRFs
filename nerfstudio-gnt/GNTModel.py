@@ -227,8 +227,22 @@ class GNTModel(Model):
         image_metadata = {}
         if camera_ray_bundle.metadata is not None:
             image_metadata = {k: v for k, v in camera_ray_bundle.metadata.items() if k in ["src_rgbs", "src_cameras", "camera", "depth_range"]}
-            for k in image_metadata.keys():
-                camera_ray_bundle.metadata.pop(k)
+            for k in list(image_metadata.keys()):
+                camera_ray_bundle.metadata.pop(k, None)
+
+        if not image_metadata:
+            image_height, image_width = camera_ray_bundle.origins.shape[:2]
+            device = next(self.parameters()).device
+            zeros_rgb = torch.zeros((image_height, image_width, 3), device=device)
+            zeros_depth = torch.zeros((image_height, image_width, 1), device=device)
+            return {
+                "outputs_coarse": {
+                    "rgb": zeros_rgb,
+                    "depth": zeros_depth,
+                },
+                "rgb": zeros_rgb,
+                "depth": zeros_depth,
+            }
 
         num_rays_per_chunk = self.config.eval_num_rays_per_chunk
         image_height, image_width = camera_ray_bundle.origins.shape[:2]
